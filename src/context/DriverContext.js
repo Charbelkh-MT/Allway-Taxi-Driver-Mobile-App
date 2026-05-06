@@ -105,10 +105,10 @@ async function startForegroundTracking() {
       const lat = location.coords.latitude;
       const lng = location.coords.longitude;
 
-      console.log('[GPS] Position:', lat, lng);
+      console.log('[GPS] Position:', lat, lng, '| user:', user.id);
 
       // driver_locations — internal tracking table
-      await supabase.from(TABLE_LOCATIONS).upsert(
+      const locResult = await supabase.from(TABLE_LOCATIONS).upsert(
         {
           driver_id:  user.id,
           lat, lng,
@@ -119,11 +119,14 @@ async function startForegroundTracking() {
         },
         { onConflict: 'driver_id' }
       );
+      if (locResult.error) console.warn('[GPS] driver_locations error:', locResult.error.message);
 
       // drivers — CRM map reads lat/lng/online/last_seen directly from here
-      await supabase.from(TABLE_DRIVERS)
+      const drvResult = await supabase.from(TABLE_DRIVERS)
         .update({ lat, lng, online: true, last_seen: now })
         .eq(DRIVER_COLS.id, user.id);
+      if (drvResult.error) console.warn('[GPS] drivers update error:', drvResult.error.message, drvResult.error.details);
+      else console.log('[GPS] drivers updated ok');
 
     } catch (e) { console.warn('[GPS] Write error:', e.message); }
   }
