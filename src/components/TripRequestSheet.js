@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { Audio } from 'expo-av';
+import { createAudioPlayer } from 'expo-audio';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 import { FONTS, RADIUS } from '../theme';
@@ -14,18 +14,11 @@ const COUNTDOWN_MAX = 84;
 
 async function playTripSound() {
   try {
-    await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
-    // Try local file first; falls back to a free notification chime
-    const source = (() => {
-      try { return require('../../assets/trip-alert.mp3'); } catch { return null; }
-    })();
-    const { sound } = await Audio.Sound.createAsync(
-      source ?? { uri: 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg' },
-      { shouldPlay: true, isLooping: false, volume: 1.0 }
-    );
-    sound.setOnPlaybackStatusUpdate(s => { if (s.didJustFinish) sound.unloadAsync(); });
-  } catch (e) {
-    // Haptics + notification sound still fire as fallback
+    // Only plays if the local file exists — haptics fire regardless
+    const player = createAudioPlayer(require('../../assets/trip-alert.mp3'));
+    player.play();
+  } catch {
+    // File not found — haptics + push notification sound still play
   }
 }
 

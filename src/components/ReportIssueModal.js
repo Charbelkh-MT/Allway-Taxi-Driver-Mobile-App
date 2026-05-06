@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity,
   Modal, Animated, Alert,
 } from 'react-native';
-import { Audio } from 'expo-av';
+import { useAudioRecorder, AudioModule, useAudioPlayer, RecordingPresets } from 'expo-audio';
 import * as FileSystem from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
 import { supabase } from '../utils/supabase';
@@ -27,12 +27,12 @@ export default function ReportIssueModal({ visible, onClose }) {
   const [isPlaying,    setIsPlaying]    = useState(false);
   const [sent,         setSent]         = useState(false);
 
-  const recRef      = useRef(null);
-  const soundRef    = useRef(null);
-  const timerRef    = useRef(null);
-  const slideAnim   = useRef(new Animated.Value(600)).current;
-  const fadeAnim    = useRef(new Animated.Value(0)).current;
-  const pulseAnim   = useRef(new Animated.Value(1)).current;
+  const recorder   = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const player     = useAudioPlayer(recordingUri ? { uri: recordingUri } : null);
+  const timerRef   = useRef(null);
+  const slideAnim  = useRef(new Animated.Value(600)).current;
+  const fadeAnim   = useRef(new Animated.Value(0)).current;
+  const pulseAnim  = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     if (!visible) return;
@@ -56,14 +56,12 @@ export default function ReportIssueModal({ visible, onClose }) {
 
   async function startRecording() {
     try {
-      const { granted } = await Audio.requestPermissionsAsync();
-      if (!granted) {
+      const status = await AudioModule.requestRecordingPermissionsAsync();
+      if (!status.granted) {
         Alert.alert('Microphone Access', 'Please allow microphone access in your settings to record an issue.');
         return;
       }
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-      const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-      recRef.current = recording;
+      await recorder.record();
       setIsRecording(true);
       setDuration(0);
       setRecordingUri(null);
@@ -79,14 +77,10 @@ export default function ReportIssueModal({ visible, onClose }) {
 
   async function stopRecording() {
     clearInterval(timerRef.current);
-    if (!recRef.current) return;
     try {
-      await recRef.current.stopAndUnloadAsync();
-      const uri = recRef.current.getURI();
-      setRecordingUri(uri);
-      recRef.current = null;
+      await recorder.stop();
+      setRecordingUri(recorder.uri);
       setIsRecording(false);
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e) { console.warn('[Record] stop:', e.message); }
   }
@@ -94,18 +88,17 @@ export default function ReportIssueModal({ visible, onClose }) {
   async function playBack() {
     if (!recordingUri) return;
     try {
-      if (soundRef.current) { await soundRef.current.unloadAsync(); soundRef.current = null; }
-      const { sound } = await Audio.Sound.createAsync({ uri: recordingUri }, { shouldPlay: true });
-      soundRef.current = sound;
+      player.play();
       setIsPlaying(true);
-      sound.setOnPlaybackStatusUpdate(s => {
-        if (s.didJustFinish) { setIsPlaying(false); sound.unloadAsync(); soundRef.current = null; }
+      // expo-audio player auto-stops at end
+      const sub = player.addListener('playbackStatusUpdate', s => {
+        if (s.didJustFinish) { setIsPlaying(false); sub.remove(); }
       });
     } catch (e) { console.warn('[Playback]:', e.message); }
   }
 
   async function stopPlayback() {
-    if (soundRef.current) { await soundRef.current.stopAsync(); await soundRef.current.unloadAsync(); soundRef.current = null; }
+    try { player.pause(); } catch {}
     setIsPlaying(false);
   }
 
