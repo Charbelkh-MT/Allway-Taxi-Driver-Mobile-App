@@ -271,6 +271,78 @@ async function testClearDisappear() {
   log('Cleared. Button should have vanished from the home screen instantly.');
 }
 
+// ─── New tricky tests ─────────────────────────────────────────────────────────
+
+async function testMinFare() {
+  console.log('\n' + b('Tricky 1 — Minimum Fare ($1)'));
+  hr(); info('Expected: $1 displays correctly, no layout issues with tiny number.');
+  await clearPending(); await sleep(400);
+  await insert({ ...TRIPS.aub, fare_usd: 1.00, customer_name: 'Min Fare Test', distance_km: 0.5 });
+}
+
+async function testSameCustomer() {
+  console.log('\n' + b('Tricky 2 — Same Customer, Two Simultaneous Trips'));
+  hr();
+  info('Same customer phone dispatched to two different routes simultaneously.');
+  info('Expected: both appear as separate popup cards — no deduplication.');
+  await clearPending(); await sleep(400);
+  await Promise.all([
+    insert({ ...TRIPS.standard,  customer_name: 'Duplicate Joe', customer_phone: '+961 71 999 999' }),
+    insert({ ...TRIPS.highFare,  customer_name: 'Duplicate Joe', customer_phone: '+961 71 999 999' }),
+  ]);
+}
+
+async function testCancelledCheck() {
+  console.log('\n' + b('Tricky 3 — Cancelled Trip Does NOT Reappear'));
+  hr();
+  info('Insert a trip, then cancel it directly in the DB.');
+  info('Expected: button count drops, cancelled trip never reappears as available.');
+  await clearPending(); await sleep(400);
+  const id = await insert(TRIPS.verdun);
+  if (!id) return;
+  await sleep(3000);
+  await sb.from('trips').update({ status: 'cancelled' }).eq('id', id);
+  log(`Trip ${id.slice(0,8)}… cancelled in DB.`);
+  log('Expected: "Trips Available" button disappears instantly.');
+  await sleep(2000);
+  const { data } = await sb.from('trips').select('status').eq('id', id).single();
+  data?.status === 'cancelled'
+    ? log(`✓ DB confirmed: status = cancelled`)
+    : err(`Status is ${data?.status} — expected cancelled`);
+}
+
+async function testNoPhone() {
+  console.log('\n' + b('Tricky 4 — Customer With No Phone Number'));
+  hr();
+  info('Expected: no crash, phone chip hidden in ActiveTrip card.');
+  await clearPending(); await sleep(400);
+  await insert({ ...TRIPS.aub, customer_name: 'No Phone Customer', customer_phone: null });
+}
+
+async function testHighVolume() {
+  console.log('\n' + b('Tricky 5 — High Volume (10 trips in 3 seconds)'));
+  hr();
+  info('Stress test: 10 trips fired in quick succession.');
+  info('Expected: button shows correct count, no trips lost, no duplicates.');
+  await clearPending(); await sleep(400);
+  const names = ['Ali','Reem','Jad','Nour','Sami','Dina','Omar','Lara','Elie','Maya'];
+  const inserts = names.map((n, i) => insert({
+    customer_name: n + ' Test',
+    customer_phone: `+961 70 00 ${String(i).padStart(4,'0')}`,
+    pickup_address: ['Hamra','Verdun','Achrafieh','Jounieh','Saida'][i % 5] + ', Lebanon',
+    dropoff_address: ['ABC Mall','Gemmayze','AUB','Downtown','Dbayeh'][i % 5],
+    fare_usd: 10 + i * 2,
+    distance_km: 3 + i,
+    status: 'pending',
+  }));
+  await Promise.all(inserts);
+  const { data } = await sb.from('trips').select('id').eq('status', 'pending');
+  log(`${data?.length ?? 0} pending trips in DB — button should show that count.`);
+  await sleep(3000);
+  await clearPending();
+  log('Cleared. Button should vanish.');
+}
+
 async function runAll() {
   console.log('\n' + b('\x1b[36m  Allway Taxi — Full Dispatch Test Suite\x1b[0m'));
   hr();
@@ -319,6 +391,11 @@ const cmd = process.argv[2] ?? 'help';
     case 'clearall':       await clearAll();            break;
     case 'all':            await runAll();              break;
     case 'edge':           await runEdge();             break;
+    case 'minfare':        await testMinFare();         break;
+    case 'samecustomer':   await testSameCustomer();    break;
+    case 'cancelledcheck': await testCancelledCheck();  break;
+    case 'nophone':        await testNoPhone();         break;
+    case 'highvolume':     await testHighVolume();      break;
     default:
       console.log('\n' + b('Allway Taxi Test Runner') + '\n');
       console.log('  ' + b('Standard') + ':  single · multi · high · rapid · expiry · decline');
