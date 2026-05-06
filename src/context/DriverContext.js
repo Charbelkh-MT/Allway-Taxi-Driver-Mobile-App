@@ -126,9 +126,9 @@ async function startForegroundTracking() {
       );
       if (locResult.error) console.warn('[GPS] driver_locations error:', locResult.error.message);
 
-      // drivers — CRM map reads lat/lng/online/last_seen/status directly from here
+      // drivers — GPS tick only updates position + last_seen, never touches online
       const drvResult = await supabase.from(TABLE_DRIVERS)
-        .update({ lat, lng, online: true, last_seen: now, [DRIVER_COLS.status]: 'available' })
+        .update({ lat, lng, last_seen: now })
         .eq(DRIVER_COLS.id, user.id);
       if (drvResult.error) console.warn('[GPS] drivers update error:', drvResult.error.message, drvResult.error.details);
       else console.log('[GPS] drivers updated ok');
@@ -309,6 +309,13 @@ export function DriverProvider({ children }) {
     // Real mode — subscribe first, then log shift
     isDemoRef.current = false;
     subscribeToTrips(user.id);
+
+    // Mark driver online in CRM
+    try {
+      await supabase.from(TABLE_DRIVERS)
+        .update({ online: true, [DRIVER_COLS.status]: 'available' })
+        .eq(DRIVER_COLS.id, user.id);
+    } catch (e) { console.warn('[DriverContext] online mark error:', e.message); }
 
     // Fetch any trips already pending before we came online
     try {
