@@ -87,19 +87,24 @@ function normalizeTrip(row) {
 
 // ─── Foreground location watcher (Expo Go fallback) ───────────────────────────
 let foregroundInterval = null;
+let isTracking        = false;
 
 async function startForegroundTracking() {
   const { status } = await Location.requestForegroundPermissionsAsync();
   if (status !== 'granted') { console.warn('[GPS] Permission denied'); return; }
   if (foregroundInterval) return;
 
+  isTracking = true;
+
   async function pushLocation() {
+    if (!isTracking) return; // shift ended mid-flight — discard
     try {
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
+      if (!isTracking) return; // ended while waiting for GPS
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user || !isTracking) return;
 
       const now = new Date().toISOString();
       const lat = location.coords.latitude;
@@ -138,6 +143,7 @@ async function startForegroundTracking() {
 }
 
 async function stopForegroundTracking() {
+  isTracking = false;
   if (foregroundInterval) {
     clearInterval(foregroundInterval);
     foregroundInterval = null;
