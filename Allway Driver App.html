@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0D0D14">
+  <title>Allway Driver App</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%;
+      background: #08080F;
+      font-family: 'Inter', system-ui, sans-serif;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ── Stage (desktop: centered frame) ── */
+    #stage {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+
+    /* ── Ambient glow behind phone ── */
+    #stage::before {
+      content: '';
+      position: absolute;
+      width: 340px; height: 340px;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      background: radial-gradient(circle, rgba(245,184,0,0.12) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+      animation: ambientPulse 4s ease-in-out infinite;
+    }
+    @keyframes ambientPulse {
+      0%,100% { opacity: 0.7; transform: translate(-50%, -50%) scale(1); }
+      50%      { opacity: 1;   transform: translate(-50%, -50%) scale(1.12); }
+    }
+
+    /* ── Phone frame wrapper ── */
+    #phone-wrapper {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── Screen labels ── */
+    #screen-label {
+      position: absolute;
+      bottom: -38px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px;
+      font-weight: 700;
+      color: rgba(255,255,255,0.28);
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    /* ── Mobile: full-screen, no bezel ── */
+    @media (max-width: 600px) {
+      html, body { background: #0D0D14; }
+      #stage::before { display: none; }
+      #phone-wrapper {
+        width: 100vw !important;
+        height: 100vh !important;
+        height: 100dvh !important;
+        transform: none !important;
+      }
+      #screen-label { display: none; }
+      /* Hide the IOSDevice bezel chrome, show only the content slot */
+      #frame-root > div { transform: none !important; }
+    }
+
+    /* ── Tweaks panel ── */
+    #tweaks-panel {
+      display: none;
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 999;
+      width: 240px;
+      background: rgba(20,20,30,0.97);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 18px;
+      padding: 18px;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 16px 48px rgba(0,0,0,0.6);
+      color: #F0F0F0;
+      font-family: 'Inter', sans-serif;
+    }
+    #tweaks-panel.visible { display: block; }
+    .tweak-title {
+      font-size: 12px; font-weight: 800; letter-spacing: 0.8px;
+      color: rgba(255,255,255,0.9); margin-bottom: 14px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .tweak-close {
+      background: none; border: none; cursor: pointer;
+      color: rgba(255,255,255,0.4); font-size: 16px; line-height: 1;
+      padding: 0;
+    }
+    .tweak-group { margin-bottom: 14px; }
+    .tweak-label {
+      font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.35);
+      letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 7px;
+    }
+    .tweak-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+    .tweak-pill {
+      padding: 5px 10px; border-radius: 999px; font-size: 11px; font-weight: 700;
+      cursor: pointer; border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.5);
+      font-family: 'Inter', sans-serif; transition: all .15s;
+    }
+    .tweak-pill.active {
+      background: rgba(245,184,0,0.15); border-color: rgba(245,184,0,0.4);
+      color: #F5B800;
+    }
+  </style>
+</head>
+<body>
+
+<div id="stage">
+  <div id="phone-wrapper">
+    <!-- iPhone 15 Pro frame rendered by ios-frame.jsx -->
+    <div id="frame-root"></div>
+    <div id="screen-label">Splash</div>
+  </div>
+</div>
+
+<!-- Tweaks panel (shown when toolbar toggles edit mode) -->
+<div id="tweaks-panel">
+  <div class="tweak-title">
+    Tweaks
+    <button class="tweak-close" id="tweaks-close">✕</button>
+  </div>
+
+  <div class="tweak-group">
+    <div class="tweak-label">Jump to Screen</div>
+    <div class="tweak-pills" id="screen-jumper"></div>
+  </div>
+
+  <div class="tweak-group">
+    <div class="tweak-label">Driver Name</div>
+    <div class="tweak-pills" id="driver-pills">
+      <button class="tweak-pill active" data-name="Ahmad Khoury">Ahmad</button>
+      <button class="tweak-pill" data-name="Sara Rizk">Sara</button>
+      <button class="tweak-pill" data-name="Karim Nassar">Karim</button>
+    </div>
+  </div>
+</div>
+
+<!-- React + Babel -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<!-- iOS frame component -->
+<script type="text/babel" src="ios-frame.jsx"></script>
+
+<!-- App components -->
+<script type="text/babel" src="Components.jsx"></script>
+<script type="text/babel" src="Screens.jsx"></script>
+
+<!-- Wrapper: mount DriverApp inside iOSFrame -->
+<script type="text/babel">
+
+// ── Shift timer hook ──────────────────────────────────────────────────────────
+function useShiftTimer(running) {
+  const [seconds, setSeconds] = React.useState(5 * 60 + 23);
+  React.useEffect(() => {
+    if (!running) { setSeconds(5 * 60 + 23); return; }
+    const start = Date.now() - (5 * 60 + 23) * 1000;
+    const id = setInterval(() => setSeconds(Math.floor((Date.now() - start) / 1000)), 1000);
+    return () => clearInterval(id);
+  }, [running]);
+  const h = String(Math.floor(seconds / 3600)).padStart(2, '0');
+  const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
+  const s = String(seconds % 60).padStart(2, '0');
+  return `${h}:${m}:${s}`;
+}
+
+const PENDING_TRIP = { pickup: 'Hamra, Beirut', dropoff: 'ABC Mall, Dbayeh', fare: '$22', dist: '14 km', customer: 'Ahmad K.' };
+const BASE_ACTIVE  = { customer: 'Ahmad Khoury', phone: '+961 71 234 567', pickup: 'Hamra, Beirut', dropoff: 'ABC Mall, Dbayeh', fare: '$22', dist: '14 km' };
+
+// Screen label map
+const SCREEN_LABELS = {
+  'splash':   '01 — Splash',
+  'login':    '02 — Login',
+  'offline':  '03 — Home · Offline',
+  'scanning': '04 — Home · Scanning',
+  'trips':    '05 — Home · Trips Available',
+  'active':   '06 — Home · Active Trip',
+  'sheet':    '07 — Trip Request Sheet',
+  'tab-trips':'08 — Trips Tab',
+  'account':  '09 — Account Tab',
+};
+
+function DriverApp({ driverName }) {
+  const [screen, setScreen]         = React.useState('splash');
+  const [homeState, setHomeState]   = React.useState('offline');
+  const [tab, setTab]               = React.useState('home');
+  const [showSheet, setShowSheet]   = React.useState(false);
+  const [countdown, setCountdown]   = React.useState(84);
+  const [activeTrip, setActiveTrip] = React.useState(null);
+
+  const online    = homeState !== 'offline';
+  const shiftTime = useShiftTimer(online);
+
+  // expose jump fn globally for tweaks
+  React.useEffect(() => {
+    window.__jumpTo = (s) => {
+      if (s === 'splash')    { setScreen('splash'); setTab('home'); setHomeState('offline'); setShowSheet(false); }
+      if (s === 'login')     { setScreen('login');  setTab('home'); setHomeState('offline'); setShowSheet(false); }
+      if (s === 'offline')   { setScreen('app');    setTab('home'); setHomeState('offline'); setShowSheet(false); }
+      if (s === 'scanning')  { setScreen('app');    setTab('home'); setHomeState('scanning'); setShowSheet(false); }
+      if (s === 'trips')     { setScreen('app');    setTab('home'); setHomeState('trips');   setShowSheet(false); }
+      if (s === 'active')    { setScreen('app');    setTab('home'); setHomeState('active');  setActiveTrip(BASE_ACTIVE); setShowSheet(false); }
+      if (s === 'sheet')     { setScreen('app');    setTab('home'); setHomeState('scanning'); setShowSheet(true); }
+      if (s === 'tab-trips') { setScreen('app');    setTab('trips'); setShowSheet(false); }
+      if (s === 'account')   { setScreen('app');    setTab('account'); setShowSheet(false); }
+    };
+  }, []);
+
+  // Compute current screen key for label
+  React.useEffect(() => {
+    let key = 'splash';
+    if (screen === 'login')  key = 'login';
+    else if (screen === 'app') {
+      if (showSheet)           key = 'sheet';
+      else if (tab === 'trips')    key = 'tab-trips';
+      else if (tab === 'account')  key = 'account';
+      else                         key = homeState;
+    }
+    const el = document.getElementById('screen-label');
+    if (el) el.textContent = SCREEN_LABELS[key] || '';
+  });
+
+  // Splash → Login
+  React.useEffect(() => {
+    if (screen !== 'splash') return;
+    const t = setTimeout(() => setScreen('login'), 2600);
+    return () => clearTimeout(t);
+  }, [screen]);
+
+  // Sheet countdown
+  React.useEffect(() => {
+    if (!showSheet) return;
+    setCountdown(84);
+    const id = setInterval(() => setCountdown(p => {
+      if (p <= 1) { clearInterval(id); setShowSheet(false); return 0; }
+      return p - 1;
+    }), 1000);
+    return () => clearInterval(id);
+  }, [showSheet]);
+
+  function goOnline()  { setHomeState('scanning'); setTimeout(() => setHomeState('trips'), 2800); }
+  function goOffline() { setHomeState('offline'); setActiveTrip(null); setShowSheet(false); }
+
+  function acceptTrip(trip) {
+    setActiveTrip(trip ? { ...BASE_ACTIVE, pickup: trip.pickup, dropoff: trip.dropoff, fare: trip.fare } : BASE_ACTIVE);
+    setHomeState('active');
+    setShowSheet(false);
+  }
+  function completeTrip() { setActiveTrip(null); setHomeState('scanning'); setTimeout(() => setHomeState('trips'), 2800); }
+
+  const driver = driverName || 'Ahmad Khoury';
+
+  if (screen === 'splash') return (
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#0D0D14' }}>
+      <style>{GLOBAL_CSS}</style>
+      <SplashScreen />
+    </div>
+  );
+
+  if (screen === 'login') return (
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#0D0D14', overflow: 'hidden' }}>
+      <style>{GLOBAL_CSS}</style>
+      <LoginScreen onLogin={() => setScreen('app')} />
+    </div>
+  );
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#0D0D14', overflow: 'hidden', position: 'relative' }}>
+      <style>{GLOBAL_CSS}</style>
+      <AppBar online={online} />
+      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {tab === 'home' && homeState === 'offline'  && <HomeOffline driver={driver} onGoOnline={goOnline} />}
+        {tab === 'home' && homeState === 'scanning' && <HomeScanning driver={driver} shiftTime={shiftTime} onGoOffline={goOffline} />}
+        {tab === 'home' && homeState === 'trips'    && <HomeTripsAvailable shiftTime={shiftTime} onAccept={acceptTrip} onGoOffline={goOffline} />}
+        {tab === 'home' && homeState === 'active'   && <HomeActiveTrip trip={activeTrip} shiftTime={shiftTime} onComplete={completeTrip} onGoOffline={goOffline} />}
+        {tab === 'trips'   && <TripsScreen />}
+        {tab === 'account' && <AccountScreen driver={driver} />}
+      </div>
+      <TabBar tab={tab} setTab={t => setTab(t)} />
+
+      {/* Demo trigger */}
+      {tab === 'home' && online && !showSheet && homeState !== 'active' && (
+        <div style={{ position: 'absolute', bottom: 70, right: 14, zIndex: 50 }}>
+          <button onClick={() => setShowSheet(true)} style={{
+            background: 'rgba(245,184,0,0.92)', color: '#000',
+            border: 'none', borderRadius: 22, padding: '8px 14px',
+            fontSize: 11, fontWeight: 800, cursor: 'pointer',
+            fontFamily: 'Inter,sans-serif',
+            boxShadow: '0 4px 18px rgba(245,184,0,0.45)',
+          }}>+ New Request</button>
+        </div>
+      )}
+
+      {showSheet && (
+        <TripRequestSheet
+          trip={PENDING_TRIP}
+          countdown={countdown}
+          maxCountdown={84}
+          onAccept={() => acceptTrip(null)}
+          onDecline={() => setShowSheet(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Root with iOS frame ───────────────────────────────────────────────────────
+const isMobile = () => window.innerWidth <= 600;
+
+function Root() {
+  const [driverName, setDriverName] = React.useState('Ahmad Khoury');
+  const [mobile, setMobile] = React.useState(isMobile());
+  window.__setDriverName = setDriverName;
+
+  React.useEffect(() => {
+    const handler = () => setMobile(isMobile());
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+
+  if (mobile) {
+    return (
+      <div style={{
+        position: 'fixed', inset: 0,
+        background: '#0D0D14',
+        display: 'flex', flexDirection: 'column',
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+      }}>
+        <DriverApp driverName={driverName} />
+      </div>
+    );
+  }
+
+  return (
+    <IOSDevice dark={true} time="9:41" width={393} height={852}>
+      <DriverApp driverName={driverName} />
+    </IOSDevice>
+  );
+}
+
+// Scale phone to fit viewport (desktop only)
+function scalePhone() {
+  if (isMobile()) return;
+  const wrapper = document.getElementById('phone-wrapper');
+  if (!wrapper) return;
+  const frame = wrapper.querySelector('[data-ios-frame]') || wrapper.firstElementChild;
+  if (!frame) return;
+  const W = frame.offsetWidth  || 393;
+  const H = frame.offsetHeight || 852;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const scale = Math.min((vw * 0.92) / W, (vh * 0.92) / H, 1.2);
+  wrapper.style.transform = `scale(${scale})`;
+  wrapper.style.transformOrigin = 'center center';
+}
+
+const frameRoot = ReactDOM.createRoot(document.getElementById('frame-root'));
+frameRoot.render(<Root />);
+setTimeout(scalePhone, 80);
+window.addEventListener('resize', scalePhone);
+
+// ── Tweaks panel wiring ───────────────────────────────────────────────────────
+const SCREENS = [
+  { id: 'splash',    label: '1 Splash' },
+  { id: 'login',     label: '2 Login' },
+  { id: 'offline',   label: '3 Offline' },
+  { id: 'scanning',  label: '4 Scanning' },
+  { id: 'trips',     label: '5 Trips' },
+  { id: 'active',    label: '6 Active' },
+  { id: 'sheet',     label: '7 Sheet' },
+  { id: 'tab-trips', label: '8 History' },
+  { id: 'account',   label: '9 Account' },
+];
+
+const jumper = document.getElementById('screen-jumper');
+SCREENS.forEach(s => {
+  const btn = document.createElement('button');
+  btn.className = 'tweak-pill';
+  btn.textContent = s.label;
+  btn.onclick = () => {
+    document.querySelectorAll('#screen-jumper .tweak-pill').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    window.__jumpTo && window.__jumpTo(s.id);
+  };
+  jumper.appendChild(btn);
+});
+
+// Driver name pills
+document.querySelectorAll('#driver-pills .tweak-pill').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('#driver-pills .tweak-pill').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    window.__setDriverName && window.__setDriverName(btn.dataset.name);
+  };
+});
+
+// Tweaks show/hide protocol
+window.addEventListener('message', e => {
+  if (e.data?.type === '__activate_edit_mode')   document.getElementById('tweaks-panel').classList.add('visible');
+  if (e.data?.type === '__deactivate_edit_mode') document.getElementById('tweaks-panel').classList.remove('visible');
+});
+document.getElementById('tweaks-close').onclick = () => {
+  document.getElementById('tweaks-panel').classList.remove('visible');
+  window.parent.postMessage({ type: '__edit_mode_dismissed' }, '*');
+};
+window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+
+</script>
+</body>
+</html>

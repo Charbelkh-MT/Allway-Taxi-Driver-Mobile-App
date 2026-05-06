@@ -1,0 +1,77 @@
+{
+  "expo": {
+    "name": "Allway Driver",
+    "slug": "allway-driver-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/allway-main-logo.jpg",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/allway-main-logo.jpg",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.allwaytaxi.driver",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Allway Driver needs your location to match you with nearby trips.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Allway Driver tracks your location in the background so dispatchers can see your position when you are online.",
+        "NSLocationAlwaysUsageDescription": "Allway Driver tracks your location in the background while you are on shift.",
+        "NSCameraUsageDescription": "Used to scan documents for driver verification.",
+        "UIBackgroundModes": [
+          "location",
+          "fetch",
+          "remote-notification"
+        ]
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/allway-main-logo.jpg",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.allwaytaxi.driver",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#F5B800",
+          "sounds": []
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Allway Driver to use your location to match you with trips and share your position with dispatch.",
+          "locationAlwaysPermission": "Allow Allway Driver to use your location in the background while you are on shift.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      "expo-task-manager",
+      "expo-asset",
+      "expo-font",
+      "expo-secure-store"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "allway-driver-app"
+      }
+    }
+  }
+}
