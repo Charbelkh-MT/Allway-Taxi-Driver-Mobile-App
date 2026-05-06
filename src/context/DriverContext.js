@@ -3,7 +3,7 @@ import { Alert } from 'react-native';
 import * as Location from 'expo-location';
 import { supabase } from '../utils/supabase';
 import { startLocationTracking, stopLocationTracking } from '../utils/locationTask';
-import { TABLE_SHIFTS, TABLE_LOCATIONS, TABLE_TRIPS, TRIP_COLS } from '../config';
+import { TABLE_SHIFTS, TABLE_LOCATIONS, TABLE_TRIPS, TABLE_DRIVERS, TRIP_COLS, DRIVER_COLS } from '../config';
 import { sendTripNotification } from '../utils/notifications';
 
 export const DRIVER_STATE = {
