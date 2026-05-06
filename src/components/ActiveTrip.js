@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Linking, Alert, Modal, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -57,12 +57,31 @@ function TripSuccessOverlay({ visible, trip, paymentMethod, onDone }) {
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
+function formatElapsed(s) {
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+  return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+}
+
 export default function ActiveTrip({ trip, onComplete, onPickUp, onNoShow, onCancel }) {
   const { colors } = useTheme();
   const { t, isRTL } = useLanguage();
   const [showPayment, setShowPayment] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [paidMethod,  setPaidMethod]  = useState(null);
+  const [elapsed,     setElapsed]     = useState(0);
+  const startRef = useRef(Date.now());
+  const timerRef = useRef(null);
+
+  // Live trip timer — starts when ActiveTrip mounts (trip accepted)
+  useEffect(() => {
+    timerRef.current = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startRef.current) / 1000));
+    }, 1000);
+    return () => clearInterval(timerRef.current);
+  }, []);
 
   const isAccepted = trip.status === 'accepted' || !trip.status;
   const isPickedUp = trip.status === 'picked_up';
@@ -138,12 +157,15 @@ export default function ActiveTrip({ trip, onComplete, onPickUp, onNoShow, onCan
     <View style={styles.container}>
       <View style={[styles.card, { backgroundColor: `${colors.green}14`, borderColor: `${colors.green}40` }]}>
 
-        {/* Status badge */}
+        {/* Status badge + elapsed timer */}
         <View style={styles.badgeRow}>
           <View style={[styles.dot, { backgroundColor: colors.green }]} />
-          <Text style={[styles.badgeText, { color: colors.green }]}>
+          <Text style={[styles.badgeText, { color: colors.green, flex: 1 }]}>
             {isPickedUp ? t('passengerOnBoard') : t('headingToPickup')}
           </Text>
+          <View style={[styles.timerChip, { backgroundColor: `${colors.green}20`, borderColor: `${colors.green}40` }]}>
+            <Text style={[styles.timerText, { color: colors.green }]}>⏱ {formatElapsed(elapsed)}</Text>
+          </View>
         </View>
 
         {/* Customer */}
@@ -207,7 +229,7 @@ export default function ActiveTrip({ trip, onComplete, onPickUp, onNoShow, onCan
                 <Text style={[styles.secondaryBtnText, { color: colors.textSecondary }]}>{t('toPickup')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.secondaryBtn, { backgroundColor: colors.redFaint, borderColor: `${colors.red}25` }]}
+                style={[styles.secondaryBtn, { backgroundColor: colors.redFaint, borderColor: `${colors.red}25`, flex: 1 }]}
                 onPress={handleNoShow}
                 activeOpacity={0.75}
               >
@@ -296,6 +318,8 @@ const styles = StyleSheet.create({
   badgeRow:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
   dot:          { width: 8, height: 8, borderRadius: 4 },
   badgeText:    { fontSize: 10, fontFamily: FONTS.extraBold, letterSpacing: 1.2 },
+  timerChip:    { borderWidth: 1, borderRadius: 10, paddingVertical: 3, paddingHorizontal: 10 },
+  timerText:    { fontSize: 12, fontFamily: FONTS.black, fontVariant: ['tabular-nums'] },
 
   customerName: { fontSize: 22, fontFamily: FONTS.black, marginBottom: 10 },
   phoneChip:    { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 12, marginBottom: 18 },

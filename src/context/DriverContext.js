@@ -383,6 +383,7 @@ export function DriverProvider({ children }) {
           .update({
             [TRIP_COLS.driverId]: user.id,
             [TRIP_COLS.status]:   'accepted',
+            accepted_at:          new Date().toISOString(),
           })
           .eq(TRIP_COLS.id,     resolved.id)
           .eq(TRIP_COLS.status, 'pending')
