@@ -99,18 +99,29 @@ async function startForegroundTracking() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
+
+        const now = new Date().toISOString();
+        const lat = location.coords.latitude;
+        const lng = location.coords.longitude;
+
+        // driver_locations — internal tracking table
         await supabase.from(TABLE_LOCATIONS).upsert(
           {
             driver_id:  user.id,
-            lat:        location.coords.latitude,
-            lng:        location.coords.longitude,
+            lat, lng,
             heading:    location.coords.heading ?? 0,
             speed:      location.coords.speed   ?? 0,
             is_online:  true,
-            updated_at: new Date().toISOString(),
+            updated_at: now,
           },
           { onConflict: 'driver_id' }
         );
+
+        // drivers — CRM map reads lat/lng/online/last_seen directly from here
+        await supabase.from(TABLE_DRIVERS)
+          .update({ lat, lng, online: true, last_seen: now })
+          .eq(DRIVER_COLS.id, user.id);
+
       } catch (e) { console.warn('[GPS] Write error:', e.message); }
     }
   );
@@ -126,10 +137,15 @@ async function stopForegroundTracking() {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
+      const now = new Date().toISOString();
       await supabase.from(TABLE_LOCATIONS).upsert(
-        { driver_id: user.id, is_online: false, updated_at: new Date().toISOString() },
+        { driver_id: user.id, is_online: false, updated_at: now },
         { onConflict: 'driver_id' }
       );
+      // Mark offline in drivers table so CRM map removes the marker
+      await supabase.from(TABLE_DRIVERS)
+        .update({ online: false, last_seen: now })
+        .eq(DRIVER_COLS.id, user.id);
     }
   } catch (e) { console.warn('[GPS] Offline mark error:', e.message); }
 }
