@@ -86,52 +86,58 @@ function normalizeTrip(row) {
 }
 
 // ─── Foreground location watcher (Expo Go fallback) ───────────────────────────
-let foregroundSubscription = null;
+let foregroundInterval = null;
 
 async function startForegroundTracking() {
   const { status } = await Location.requestForegroundPermissionsAsync();
   if (status !== 'granted') { console.warn('[GPS] Permission denied'); return; }
-  if (foregroundSubscription) return;
+  if (foregroundInterval) return;
 
-  foregroundSubscription = await Location.watchPositionAsync(
-    { accuracy: Location.Accuracy.High, timeInterval: 5000, distanceInterval: 0 },
-    async (location) => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+  async function pushLocation() {
+    try {
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-        const now = new Date().toISOString();
-        const lat = location.coords.latitude;
-        const lng = location.coords.longitude;
+      const now = new Date().toISOString();
+      const lat = location.coords.latitude;
+      const lng = location.coords.longitude;
 
-        // driver_locations — internal tracking table
-        await supabase.from(TABLE_LOCATIONS).upsert(
-          {
-            driver_id:  user.id,
-            lat, lng,
-            heading:    location.coords.heading ?? 0,
-            speed:      location.coords.speed   ?? 0,
-            is_online:  true,
-            updated_at: now,
-          },
-          { onConflict: 'driver_id' }
-        );
+      console.log('[GPS] Position:', lat, lng);
 
-        // drivers — CRM map reads lat/lng/online/last_seen directly from here
-        await supabase.from(TABLE_DRIVERS)
-          .update({ lat, lng, online: true, last_seen: now })
-          .eq(DRIVER_COLS.id, user.id);
+      // driver_locations — internal tracking table
+      await supabase.from(TABLE_LOCATIONS).upsert(
+        {
+          driver_id:  user.id,
+          lat, lng,
+          heading:    location.coords.heading ?? 0,
+          speed:      location.coords.speed   ?? 0,
+          is_online:  true,
+          updated_at: now,
+        },
+        { onConflict: 'driver_id' }
+      );
 
-      } catch (e) { console.warn('[GPS] Write error:', e.message); }
-    }
-  );
+      // drivers — CRM map reads lat/lng/online/last_seen directly from here
+      await supabase.from(TABLE_DRIVERS)
+        .update({ lat, lng, online: true, last_seen: now })
+        .eq(DRIVER_COLS.id, user.id);
+
+    } catch (e) { console.warn('[GPS] Write error:', e.message); }
+  }
+
+  // Fire immediately then every 5 seconds
+  pushLocation();
+  foregroundInterval = setInterval(pushLocation, 5000);
   console.log('[GPS] Foreground tracking started');
 }
 
 async function stopForegroundTracking() {
-  if (foregroundSubscription) {
-    foregroundSubscription.remove();
-    foregroundSubscription = null;
+  if (foregroundInterval) {
+    clearInterval(foregroundInterval);
+    foregroundInterval = null;
     console.log('[GPS] Foreground tracking stopped');
   }
   try {
