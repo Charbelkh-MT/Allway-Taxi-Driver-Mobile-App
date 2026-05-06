@@ -126,9 +126,9 @@ async function startForegroundTracking() {
       );
       if (locResult.error) console.warn('[GPS] driver_locations error:', locResult.error.message);
 
-      // drivers — CRM map reads lat/lng/online/last_seen directly from here
+      // drivers — CRM map reads lat/lng/online/last_seen/status directly from here
       const drvResult = await supabase.from(TABLE_DRIVERS)
-        .update({ lat, lng, online: true, last_seen: now })
+        .update({ lat, lng, online: true, last_seen: now, [DRIVER_COLS.status]: 'available' })
         .eq(DRIVER_COLS.id, user.id);
       if (drvResult.error) console.warn('[GPS] drivers update error:', drvResult.error.message, drvResult.error.details);
       else console.log('[GPS] drivers updated ok');
@@ -159,7 +159,7 @@ async function stopForegroundTracking() {
       );
       // Mark offline in drivers table so CRM map removes the marker
       await supabase.from(TABLE_DRIVERS)
-        .update({ online: false, last_seen: now })
+        .update({ online: false, last_seen: now, [DRIVER_COLS.status]: 'offline' })
         .eq(DRIVER_COLS.id, user.id);
     }
   } catch (e) { console.warn('[GPS] Offline mark error:', e.message); }
@@ -400,6 +400,14 @@ export function DriverProvider({ children }) {
     setShowTripSheet(false);
     setPendingTrip(null);
     setAvailableTrips(prev => prev.filter(t => t.id !== resolved.id));
+
+    // Update CRM status to on_trip
+    if (!isDemoRef.current) {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) await supabase.from(TABLE_DRIVERS).update({ [DRIVER_COLS.status]: 'on_trip' }).eq(DRIVER_COLS.id, user.id);
+      } catch {}
+    }
   }
 
   // ─── Passenger picked up (en route to drop-off) ──────────────────────────────
@@ -423,6 +431,8 @@ export function DriverProvider({ children }) {
     if (!isDemoRef.current && tripId) {
       try {
         await supabase.from(TABLE_TRIPS).update({ [TRIP_COLS.status]: 'no_show' }).eq(TRIP_COLS.id, tripId);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) await supabase.from(TABLE_DRIVERS).update({ [DRIVER_COLS.status]: 'available' }).eq(DRIVER_COLS.id, user.id);
       } catch (e) { console.warn('[DriverContext] markNoShow error:', e.message); }
     }
   }
@@ -438,6 +448,8 @@ export function DriverProvider({ children }) {
         await supabase.from(TABLE_TRIPS)
           .update({ [TRIP_COLS.status]: 'cancelled', [TRIP_COLS.cancelReason]: reason })
           .eq(TRIP_COLS.id, tripId);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) await supabase.from(TABLE_DRIVERS).update({ [DRIVER_COLS.status]: 'available' }).eq(DRIVER_COLS.id, user.id);
       } catch (e) { console.warn('[DriverContext] cancelTrip error:', e.message); }
     }
   }
@@ -455,7 +467,6 @@ export function DriverProvider({ children }) {
         setDriverState(prev => prev === DRIVER_STATE.SCANNING ? DRIVER_STATE.TRIPS : prev);
       }, 3000);
     } else if (tripId) {
-      // Try full update first; fall back to status-only if new columns don't exist yet
       try {
         await supabase
           .from(TABLE_TRIPS)
@@ -468,12 +479,14 @@ export function DriverProvider({ children }) {
       } catch (e) {
         console.warn('[DriverContext] completeTrip full update failed, retrying status only:', e.message);
         try {
-          await supabase
-            .from(TABLE_TRIPS)
-            .update({ [TRIP_COLS.status]: 'completed' })
-            .eq(TRIP_COLS.id, tripId);
+          await supabase.from(TABLE_TRIPS).update({ [TRIP_COLS.status]: 'completed' }).eq(TRIP_COLS.id, tripId);
         } catch (e2) { console.warn('[DriverContext] completeTrip fallback error:', e2.message); }
       }
+      // Restore CRM status to available
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) await supabase.from(TABLE_DRIVERS).update({ [DRIVER_COLS.status]: 'available' }).eq(DRIVER_COLS.id, user.id);
+      } catch {}
     }
   }
 
