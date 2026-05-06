@@ -19,6 +19,7 @@ const FILTERS = [
   { id: 'all',       labelKey: 'filterAll'         },
   { id: 'completed', labelKey: 'filterCompleted'   },
   { id: 'accepted',  labelKey: 'filterDispatching' },
+  { id: 'no_show',   labelKey: 'statusNoShow'      },
   { id: 'cancelled', labelKey: 'filterCancelled'   },
 ];
 

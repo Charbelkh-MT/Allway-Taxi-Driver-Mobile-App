@@ -438,8 +438,15 @@ export function DriverProvider({ children }) {
     setDriverState(DRIVER_STATE.SCANNING);
     if (!isDemoRef.current && tripId) {
       try {
-        await supabase.from(TABLE_TRIPS).update({ [TRIP_COLS.status]: 'no_show' }).eq(TRIP_COLS.id, tripId);
         const { data: { user } } = await supabase.auth.getUser();
+        // Keep driver_id set so trip appears in driver's history
+        await supabase.from(TABLE_TRIPS)
+          .update({
+            [TRIP_COLS.status]:   'no_show',
+            [TRIP_COLS.driverId]: user?.id ?? null,
+            completed_at:         new Date().toISOString(),
+          })
+          .eq(TRIP_COLS.id, tripId);
         if (user) await supabase.from(TABLE_DRIVERS).update({ [DRIVER_COLS.status]: 'available' }).eq(DRIVER_COLS.id, user.id);
       } catch (e) { console.warn('[DriverContext] markNoShow error:', e.message); }
     }
@@ -453,10 +460,16 @@ export function DriverProvider({ children }) {
     setDriverState(DRIVER_STATE.SCANNING);
     if (!isDemoRef.current && tripId) {
       try {
-        await supabase.from(TABLE_TRIPS)
-          .update({ [TRIP_COLS.status]: 'cancelled', [TRIP_COLS.cancelReason]: reason })
-          .eq(TRIP_COLS.id, tripId);
         const { data: { user } } = await supabase.auth.getUser();
+        // Keep driver_id set so trip appears in driver's history
+        await supabase.from(TABLE_TRIPS)
+          .update({
+            [TRIP_COLS.status]:       'cancelled',
+            [TRIP_COLS.cancelReason]: reason,
+            [TRIP_COLS.driverId]:     user?.id ?? null,
+            completed_at:             new Date().toISOString(),
+          })
+          .eq(TRIP_COLS.id, tripId);
         if (user) await supabase.from(TABLE_DRIVERS).update({ [DRIVER_COLS.status]: 'available' }).eq(DRIVER_COLS.id, user.id);
       } catch (e) { console.warn('[DriverContext] cancelTrip error:', e.message); }
     }
