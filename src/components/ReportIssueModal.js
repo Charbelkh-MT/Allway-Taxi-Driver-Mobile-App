@@ -4,7 +4,9 @@ import {
   Modal, Animated, Alert,
 } from 'react-native';
 import { Audio } from 'expo-av';
+import * as FileSystem from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
+import { supabase } from '../utils/supabase';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -110,9 +112,38 @@ export default function ReportIssueModal({ visible, onClose }) {
   function reset() { setRecordingUri(null); setDuration(0); }
 
   async function handleSend() {
-    // TODO: Upload recordingUri to Supabase Storage and create a support ticket in CRM
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setSent(true);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user && recordingUri) {
+        // Read recording as base64
+        const base64 = await FileSystem.readAsStringAsync(recordingUri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+
+        // Upload to Supabase Storage → voice-reports bucket
+        const fileName = `${user.id}/${Date.now()}.m4a`;
+        const { error: uploadError } = await supabase.storage
+          .from('voice-reports')
+          .upload(fileName, bytes, { contentType: 'audio/m4a', upsert: false });
+
+        if (!uploadError) {
+          // Create a support ticket row
+          await supabase.from('support_tickets').insert({
+            driver_id:    user.id,
+            audio_path:   fileName,
+            submitted_at: new Date().toISOString(),
+            status:       'open',
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('[ReportIssue] upload error:', e.message);
+    }
+
     setTimeout(() => { setSent(false); reset(); close(); }, 2500);
   }
 

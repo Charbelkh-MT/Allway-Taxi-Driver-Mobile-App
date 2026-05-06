@@ -81,6 +81,7 @@ function normalizeTrip(row) {
     pickupLng:    row[TRIP_COLS.pickupLng]  ?? null,
     fare,
     dist,
+    allowDebt: row[TRIP_COLS.allowDebt] === true,
   };
 }
 

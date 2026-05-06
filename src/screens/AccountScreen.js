@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Alert, Platform, RefreshControl, Switch, Linking,
+  Alert, Platform, RefreshControl, Switch, Linking, Image,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -60,7 +62,7 @@ const infoStyles = StyleSheet.create({
 
 
 export default function AccountScreen() {
-  const { driver, logout }              = useAuth();
+  const { driver, logout, setDriver }   = useAuth();
   const { isOnline }                    = useDriver();
   const { colors, isDark, toggleTheme } = useTheme();
   const { t, isRTL, language, setLanguage } = useLanguage();
@@ -69,6 +71,7 @@ export default function AccountScreen() {
   const [refreshing, setRefreshing]     = useState(false);
   const [pinOpen, setPinOpen]           = useState(false);
   const [showReport, setShowReport]     = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const fetchEarnings = useCallback(async () => {
     try {
@@ -113,6 +116,47 @@ export default function AccountScreen() {
     return () => { if (channel) supabase.removeChannel(channel); };
   }, [fetchEarnings]);
 
+  async function handlePhotoUpload() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission required', 'Please allow photo library access to upload a profile picture.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+    if (result.canceled) return;
+
+    setUploadingPhoto(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const uri    = result.assets[0].uri;
+      const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+      const bytes  = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+      const path   = `${user.id}/profile.jpg`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('driver-photos')
+        .upload(path, bytes, { contentType: 'image/jpeg', upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage.from('driver-photos').getPublicUrl(path);
+
+      await supabase.from('drivers').update({ photo_url: publicUrl }).eq('id', user.id);
+      setDriver(prev => ({ ...prev, photoUrl: publicUrl }));
+    } catch (e) {
+      Alert.alert('Upload failed', e.message);
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
+
   async function handleLogout() {
     Alert.alert(t('endSession'), t('logoutConfirm'), [
       { text: t('cancel'), style: 'cancel' },
@@ -153,12 +197,21 @@ export default function AccountScreen() {
 
             {/* Avatar + info row */}
             <View style={styles.profileRow}>
-              <LinearGradient colors={[colors.yellow, colors.yellowDark]} style={styles.avatar}>
-                <Svg width={34} height={34} viewBox="0 0 24 24" fill="none">
-                  <Circle cx="12" cy="8" r="4" fill="rgba(0,0,0,0.75)" />
-                  <Path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="rgba(0,0,0,0.75)" strokeWidth="2" strokeLinecap="round" />
-                </Svg>
-              </LinearGradient>
+              <TouchableOpacity onPress={handlePhotoUpload} activeOpacity={0.8} style={styles.avatarWrap}>
+                {driver.photoUrl ? (
+                  <Image source={{ uri: driver.photoUrl }} style={styles.avatar} />
+                ) : (
+                  <LinearGradient colors={[colors.yellow, colors.yellowDark]} style={styles.avatar}>
+                    <Svg width={34} height={34} viewBox="0 0 24 24" fill="none">
+                      <Circle cx="12" cy="8" r="4" fill="rgba(0,0,0,0.75)" />
+                      <Path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="rgba(0,0,0,0.75)" strokeWidth="2" strokeLinecap="round" />
+                    </Svg>
+                  </LinearGradient>
+                )}
+                <View style={[styles.cameraBadge, { backgroundColor: colors.yellow }]}>
+                  <Text style={styles.cameraIcon}>{uploadingPhoto ? '…' : '📷'}</Text>
+                </View>
+              </TouchableOpacity>
               <View style={styles.profileInfo}>
                 <Text style={[styles.driverName, { color: colors.textPrimary }]} numberOfLines={1}>{driver.name}</Text>
                 {!!driver.phone && (
@@ -352,6 +405,9 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
 
   // Profile card
+  avatarWrap:     { position: 'relative' },
+  cameraBadge:    { position: 'absolute', bottom: -4, right: -4, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  cameraIcon:     { fontSize: 11 },
   profileWrap:    { paddingHorizontal: 18, paddingTop: 4, paddingBottom: 8 },
   profileCard:    { borderWidth: 1, borderRadius: RADIUS.xxl, overflow: 'hidden', padding: 18 },
   profileGlow:    { position: 'absolute', top: 0, left: 0, right: 0, height: 72 },

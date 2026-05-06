@@ -107,6 +107,7 @@ export const TRIP_COLS = {
   distanceKm:    'distance_km',
   status:        'status',
   paymentMethod: 'payment_method',
+  allowDebt:     'allow_debt',
   cancelReason:  'cancel_reason',
   createdAt:     'requested_at',
   // Trip status values: 'pending' | 'accepted' | 'picked_up' | 'completed' | 'no_show' | 'cancelled'

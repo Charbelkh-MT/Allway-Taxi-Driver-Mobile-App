@@ -15,16 +15,17 @@ const COUNTDOWN_MAX = 84;
 async function playTripSound() {
   try {
     await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
+    // Try local file first; falls back to a free notification chime
+    const source = (() => {
+      try { return require('../../assets/trip-alert.mp3'); } catch { return null; }
+    })();
     const { sound } = await Audio.Sound.createAsync(
-      require('../../assets/trip-alert.mp3'),
+      source ?? { uri: 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg' },
       { shouldPlay: true, isLooping: false, volume: 1.0 }
     );
-    sound.setOnPlaybackStatusUpdate((status) => {
-      if (status.didJustFinish) sound.unloadAsync();
-    });
+    sound.setOnPlaybackStatusUpdate(s => { if (s.didJustFinish) sound.unloadAsync(); });
   } catch (e) {
-    // Sound file not found or device issue — haptics still fire
-    console.warn('[Sound] trip-alert:', e.message);
+    // Haptics + notification sound still fire as fallback
   }
 }
 

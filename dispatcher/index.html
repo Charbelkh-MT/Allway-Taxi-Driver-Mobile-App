@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Allway Taxi — Dispatcher</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0a0a0a; color: #f0f0f0; min-height: 100vh; }
+    .header { background: #111; border-bottom: 1px solid #222; padding: 16px 24px; display: flex; align-items: center; gap: 14px; }
+    .header img { height: 36px; border-radius: 6px; }
+    .header h1 { font-size: 18px; font-weight: 800; color: #F5B800; }
+    .header span { font-size: 12px; color: #666; }
+    .layout { display: grid; grid-template-columns: 380px 1fr; gap: 0; height: calc(100vh - 69px); }
+    .panel { padding: 20px; overflow-y: auto; }
+    .panel-left { border-right: 1px solid #1e1e1e; background: #0e0e0e; }
+    .panel-right { background: #0a0a0a; }
+    h2 { font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #666; margin-bottom: 16px; }
+    .form-group { margin-bottom: 14px; }
+    label { display: block; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; color: #888; margin-bottom: 6px; text-transform: uppercase; }
+    input, select { width: 100%; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 10px; padding: 10px 12px; color: #f0f0f0; font-size: 14px; outline: none; transition: border-color .15s; }
+    input:focus, select:focus { border-color: #F5B800; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .submit-btn { width: 100%; background: linear-gradient(135deg, #F5B800, #D4A000); color: #000; border: none; border-radius: 12px; padding: 14px; font-size: 15px; font-weight: 800; cursor: pointer; margin-top: 6px; transition: opacity .15s; }
+    .submit-btn:hover { opacity: 0.9; }
+    .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .debt-row { display: flex; align-items: center; gap: 10px; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 10px; padding: 12px; }
+    .debt-row label { margin: 0; color: #f0f0f0; font-size: 13px; text-transform: none; letter-spacing: 0; cursor: pointer; }
+    .debt-row input[type=checkbox] { width: 18px; height: 18px; accent-color: #F5B800; cursor: pointer; }
+    .toast { position: fixed; top: 20px; right: 20px; background: #5DCAA5; color: #000; padding: 12px 20px; border-radius: 10px; font-weight: 700; font-size: 13px; display: none; z-index: 999; }
+    .toast.show { display: block; animation: fadeIn .2s; }
+    .toast.err { background: #F09595; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
+
+    /* Trips table */
+    .filter-pills { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+    .pill { padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; border: 1px solid #2a2a2a; background: #1a1a1a; color: #888; cursor: pointer; }
+    .pill.active { background: #F5B800; border-color: #F5B800; color: #000; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead th { padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: #555; border-bottom: 1px solid #1e1e1e; }
+    tbody tr { border-bottom: 1px solid #141414; transition: background .1s; }
+    tbody tr:hover { background: #111; }
+    td { padding: 12px; vertical-align: top; }
+    .status-pill { display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; }
+    .s-pending   { background: rgba(245,184,0,.15);  color: #F5B800; }
+    .s-accepted  { background: rgba(245,184,0,.15);  color: #F5B800; }
+    .s-picked_up { background: rgba(93,202,165,.15); color: #5DCAA5; }
+    .s-completed { background: rgba(93,202,165,.15); color: #5DCAA5; }
+    .s-no_show   { background: rgba(240,149,149,.15);color: #F09595; }
+    .s-cancelled { background: rgba(240,149,149,.15);color: #F09595; }
+    .fare { color: #F5B800; font-weight: 800; }
+    .muted { color: #555; font-size: 12px; }
+    .cancel-btn { background: rgba(240,149,149,.12); border: 1px solid rgba(240,149,149,.2); color: #F09595; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; }
+    .empty { text-align: center; color: #444; padding: 40px; font-size: 14px; }
+    .stats-row { display: flex; gap: 12px; margin-bottom: 20px; }
+    .stat-card { background: #111; border: 1px solid #1e1e1e; border-radius: 12px; padding: 14px 18px; flex: 1; }
+    .stat-card .val { font-size: 24px; font-weight: 900; color: #F5B800; }
+    .stat-card .lbl { font-size: 11px; color: #555; margin-top: 2px; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <img src="../assets/allway-main-logo.jpg" alt="Allway" onerror="this.style.display='none'" />
+  <div>
+    <h1>Allway Taxi</h1>
+    <span>Dispatcher Dashboard</span>
+  </div>
+  <span id="live-badge" style="margin-left:auto;font-size:12px;color:#5DCAA5;">● Live</span>
+</div>
+
+<div class="layout">
+  <!-- Left: dispatch form -->
+  <div class="panel panel-left">
+    <h2>Dispatch New Trip</h2>
+
+    <div class="form-group">
+      <label>Customer Name</label>
+      <input id="cust-name" placeholder="e.g. Ahmad Khoury" />
+    </div>
+    <div class="form-group">
+      <label>Customer Phone</label>
+      <input id="cust-phone" placeholder="+961 71 234 567" />
+    </div>
+    <div class="form-group">
+      <label>Pickup Address</label>
+      <input id="pickup" placeholder="Hamra, Beirut" />
+    </div>
+    <div class="form-group">
+      <label>Drop-off Address</label>
+      <input id="dropoff" placeholder="ABC Mall, Dbayeh" />
+    </div>
+    <div class="row2">
+      <div class="form-group">
+        <label>Fare (USD)</label>
+        <input id="fare" type="number" placeholder="22" min="0" step="0.5" />
+      </div>
+      <div class="form-group">
+        <label>Distance (km)</label>
+        <input id="dist" type="number" placeholder="14.0" min="0" step="0.1" />
+      </div>
+    </div>
+    <div class="form-group">
+      <div class="debt-row">
+        <input type="checkbox" id="allow-debt" />
+        <label for="allow-debt">📋 Allow Account (Debt) payment for this customer</label>
+      </div>
+    </div>
+
+    <button class="submit-btn" id="dispatch-btn" onclick="dispatchTrip()">🚕  Dispatch Trip</button>
+  </div>
+
+  <!-- Right: live trips -->
+  <div class="panel panel-right">
+    <div class="stats-row" id="stats-row">
+      <div class="stat-card"><div class="val" id="stat-pending">—</div><div class="lbl">Pending</div></div>
+      <div class="stat-card"><div class="val" id="stat-active">—</div><div class="lbl">Active</div></div>
+      <div class="stat-card"><div class="val" id="stat-completed" style="color:#5DCAA5">—</div><div class="lbl">Completed today</div></div>
+    </div>
+
+    <div class="filter-pills">
+      <div class="pill active" onclick="setFilter('all',this)">All</div>
+      <div class="pill" onclick="setFilter('pending',this)">Pending</div>
+      <div class="pill" onclick="setFilter('accepted',this)">Accepted</div>
+      <div class="pill" onclick="setFilter('picked_up',this)">On Board</div>
+      <div class="pill" onclick="setFilter('completed',this)">Completed</div>
+      <div class="pill" onclick="setFilter('cancelled',this)">Cancelled</div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Customer</th>
+          <th>Route</th>
+          <th>Fare</th>
+          <th>Status</th>
+          <th>Driver</th>
+          <th>Time</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="trips-body">
+        <tr><td colspan="7" class="empty">Loading trips…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://hfybipzfzmxucuiaxbeu.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmeWJpcHpmem14dWN1aWF4YmV1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwMTE1OTMsImV4cCI6MjA5MTU4NzU5M30.EBOrBEk-_d02799FL3JjcNkRCi-sED0T_ZnTrksdicY';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let allTrips = [];
+let drivers  = {};
+let filter   = 'all';
+
+function toast(msg, err = false) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (err ? ' err' : '');
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+function relTime(iso) {
+  if (!iso) return '—';
+  const d = Math.floor((Date.now() - new Date(iso)) / 60000);
+  if (d < 1) return 'just now';
+  if (d < 60) return `${d}m ago`;
+  return `${Math.floor(d/60)}h ago`;
+}
+
+function setFilter(f, el) {
+  filter = f;
+  document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  render();
+}
+
+async function loadDrivers() {
+  const { data } = await sb.from('drivers').select('id, full_name');
+  (data ?? []).forEach(d => { drivers[d.id] = d.full_name; });
+}
+
+function updateStats() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  document.getElementById('stat-pending').textContent   = allTrips.filter(t => t.status === 'pending').length;
+  document.getElementById('stat-active').textContent    = allTrips.filter(t => ['accepted','picked_up'].includes(t.status)).length;
+  document.getElementById('stat-completed').textContent = allTrips.filter(t => t.status === 'completed' && new Date(t.requested_at) >= today).length;
+}
+
+function render() {
+  const list = filter === 'all' ? allTrips : allTrips.filter(t => t.status === filter);
+  const body = document.getElementById('trips-body');
+  if (!list.length) { body.innerHTML = '<tr><td colspan="7" class="empty">No trips found.</td></tr>'; return; }
+  body.innerHTML = list.map(t => `
+    <tr>
+      <td><b>${t.customer_name ?? '—'}</b><br><span class="muted">${t.customer_phone ?? ''}</span></td>
+      <td style="max-width:200px"><span style="color:#5DCAA5;font-size:11px">▲</span> ${t.pickup_address ?? '—'}<br>
+          <span style="color:#F09595;font-size:11px">▼</span> ${t.dropoff_address ?? '—'}</td>
+      <td class="fare">$${t.fare_usd ?? '—'}</td>
+      <td><span class="status-pill s-${t.status}">${t.status}</span></td>
+      <td class="muted">${t.driver_id ? (drivers[t.driver_id] ?? t.driver_id.slice(0,8)+'…') : '(unassigned)'}</td>
+      <td class="muted">${relTime(t.requested_at)}</td>
+      <td>${['pending','accepted'].includes(t.status) ? `<button class="cancel-btn" onclick="cancelTrip('${t.id}')">Cancel</button>` : ''}</td>
+    </tr>
+  `).join('');
+}
+
+async function loadTrips() {
+  const { data } = await sb.from('trips')
+    .select('id,customer_name,customer_phone,pickup_address,dropoff_address,fare_usd,status,driver_id,requested_at,completed_at')
+    .order('requested_at', { ascending: false })
+    .limit(100);
+  allTrips = data ?? [];
+  updateStats();
+  render();
+}
+
+async function dispatchTrip() {
+  const btn = document.getElementById('dispatch-btn');
+  const name   = document.getElementById('cust-name').value.trim();
+  const phone  = document.getElementById('cust-phone').value.trim();
+  const pickup = document.getElementById('pickup').value.trim();
+  const dropoff= document.getElementById('dropoff').value.trim();
+  const fare   = parseFloat(document.getElementById('fare').value);
+  const dist   = parseFloat(document.getElementById('dist').value);
+  const debt   = document.getElementById('allow-debt').checked;
+
+  if (!name || !pickup || !dropoff || isNaN(fare)) { toast('Please fill in all required fields.', true); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Dispatching…';
+
+  const { error } = await sb.from('trips').insert({
+    customer_name:    name,
+    customer_phone:   phone || null,
+    pickup_address:   pickup,
+    dropoff_address:  dropoff,
+    fare_usd:         fare,
+    distance_km:      isNaN(dist) ? null : dist,
+    allow_debt:       debt,
+    status:           'pending',
+  });
+
+  btn.disabled = false;
+  btn.textContent = '🚕  Dispatch Trip';
+
+  if (error) { toast('Error: ' + error.message, true); return; }
+
+  toast('✓ Trip dispatched — drivers are being notified!');
+  ['cust-name','cust-phone','pickup','dropoff','fare','dist'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('allow-debt').checked = false;
+}
+
+async function cancelTrip(id) {
+  if (!confirm('Cancel this trip?')) return;
+  await sb.from('trips').update({ status: 'cancelled' }).eq('id', id);
+  toast('Trip cancelled.');
+}
+
+// Realtime updates
+function setupRealtime() {
+  sb.channel('dispatcher')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, loadTrips)
+    .subscribe();
+}
+
+// Init
+(async () => {
+  await loadDrivers();
+  await loadTrips();
+  setupRealtime();
+})();
+</script>
+</body>
+</html>

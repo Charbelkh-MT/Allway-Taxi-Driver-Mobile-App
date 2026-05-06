@@ -14,9 +14,10 @@ export default function PaymentModal({ trip, visible, onComplete, onCancel }) {
   const { t, isRTL } = useLanguage();
 
   const METHODS = [
-    { id: 'cash', icon: '💵', labelKey: 'cash',  subKey: 'cashSub', color: 'green'  },
-    { id: 'card', icon: '💳', labelKey: 'card',  subKey: 'cardSub', color: 'yellow' },
-    { id: 'debt', icon: '📋', labelKey: 'debt',  subKey: 'debtSub', color: 'red'    },
+    { id: 'cash', icon: '💵', labelKey: 'cash', subKey: 'cashSub', color: 'green'  },
+    { id: 'card', icon: '💳', labelKey: 'card', subKey: 'cardSub', color: 'yellow' },
+    // Debt only shown if dispatcher enabled it for this customer
+    ...(trip?.allowDebt ? [{ id: 'debt', icon: '📋', labelKey: 'debt', subKey: 'debtSub', color: 'red' }] : []),
   ];
   const insets     = useSafeAreaInsets();
   const slideAnim  = useRef(new Animated.Value(500)).current;
