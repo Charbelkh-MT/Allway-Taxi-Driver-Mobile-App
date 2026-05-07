@@ -385,14 +385,14 @@ export function DriverProvider({ children }) {
 
     if (!isDemoRef.current && resolved.id) {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        const userId = userIdRef.current;
+        if (!userId) return;
 
         // Atomic: only succeeds if trip is still unclaimed (status = 'pending')
         const { data } = await supabase
           .from(TABLE_TRIPS)
           .update({
-            [TRIP_COLS.driverId]: user.id,
+            [TRIP_COLS.driverId]: userId,
             [TRIP_COLS.status]:   'accepted',
             accepted_at:          new Date().toISOString(),
           })
@@ -421,10 +421,10 @@ export function DriverProvider({ children }) {
     setAvailableTrips(prev => prev.filter(t => t.id !== resolved.id));
 
     // Update CRM status to on_trip
-    if (!isDemoRef.current) {
+    const uid = userIdRef.current;
+    if (!isDemoRef.current && uid) {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) await supabase.from(TABLE_DRIVERS).update({ [DRIVER_COLS.status]: 'on_trip' }).eq(DRIVER_COLS.id, user.id);
+        await supabase.from(TABLE_DRIVERS).update({ [DRIVER_COLS.status]: 'on_trip' }).eq(DRIVER_COLS.id, uid);
       } catch {}
     }
   }
@@ -512,10 +512,12 @@ export function DriverProvider({ children }) {
         } catch (e2) { console.warn('[DriverContext] completeTrip fallback error:', e2.message); }
       }
       // Restore CRM status to available
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) await supabase.from(TABLE_DRIVERS).update({ [DRIVER_COLS.status]: 'available' }).eq(DRIVER_COLS.id, user.id);
-      } catch {}
+      const uid = userIdRef.current;
+      if (uid) {
+        try {
+          await supabase.from(TABLE_DRIVERS).update({ [DRIVER_COLS.status]: 'available' }).eq(DRIVER_COLS.id, uid);
+        } catch {}
+      }
     }
   }
 
