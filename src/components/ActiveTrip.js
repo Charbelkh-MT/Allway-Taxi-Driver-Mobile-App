@@ -1,9 +1,10 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Linking, Alert, Modal, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
+import { formatTime } from '../utils/dateUtils';
 import { FONTS, RADIUS } from '../theme';
 import PaymentModal from './PaymentModal';
 
@@ -57,14 +58,6 @@ function TripSuccessOverlay({ visible, trip, paymentMethod, onDone }) {
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-function formatElapsed(s) {
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = s % 60;
-  if (h > 0) return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
-  return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
-}
-
 export default function ActiveTrip({ trip, onComplete, onPickUp, onNoShow, onCancel }) {
   const { colors } = useTheme();
   const { t, isRTL } = useLanguage();
@@ -164,7 +157,7 @@ export default function ActiveTrip({ trip, onComplete, onPickUp, onNoShow, onCan
             {isPickedUp ? t('passengerOnBoard') : t('headingToPickup')}
           </Text>
           <View style={[styles.timerChip, { backgroundColor: `${colors.green}20`, borderColor: `${colors.green}40` }]}>
-            <Text style={[styles.timerText, { color: colors.green }]}>⏱ {formatElapsed(elapsed)}</Text>
+            <Text style={[styles.timerText, { color: colors.green }]}>⏱ {formatTime(elapsed)}</Text>
           </View>
         </View>
 

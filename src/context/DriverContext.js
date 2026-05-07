@@ -5,6 +5,7 @@ import { supabase } from '../utils/supabase';
 import { startLocationTracking, stopLocationTracking } from '../utils/locationTask';
 import { TABLE_SHIFTS, TABLE_LOCATIONS, TABLE_TRIPS, TABLE_DRIVERS, TRIP_COLS, DRIVER_COLS } from '../config';
 import { sendTripNotification } from '../utils/notifications';
+import { formatTime } from '../utils/dateUtils';
 
 export const DRIVER_STATE = {
   OFFLINE:  'offline',
@@ -47,13 +48,6 @@ export const DEMO_AVAILABLE_TRIPS = [
   },
 ];
 
-function formatTime(seconds) {
-  const h = String(Math.floor(seconds / 3600)).padStart(2, '0');
-  const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
-  const s = String(seconds % 60).padStart(2, '0');
-  return `${h}:${m}:${s}`;
-}
-
 // Haversine distance between two lat/lng points in kilometres
 function haversineKm(lat1, lon1, lat2, lon2) {
   const R    = 6371;
@@ -89,7 +83,7 @@ function normalizeTrip(row) {
 let foregroundInterval = null;
 let isTracking        = false;
 
-async function startForegroundTracking() {
+async function startForegroundTracking(cachedUserId) {
   const { status } = await Location.requestForegroundPermissionsAsync();
   if (status !== 'granted') { console.warn('[GPS] Permission denied'); return; }
   if (foregroundInterval) return;
@@ -103,19 +97,16 @@ async function startForegroundTracking() {
         accuracy: Location.Accuracy.Balanced,
       });
       if (!isTracking) return; // ended while waiting for GPS
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user || !isTracking) return;
 
       const now = new Date().toISOString();
       const lat = location.coords.latitude;
       const lng = location.coords.longitude;
 
-      console.log('[GPS] Position:', lat, lng, '| user:', user.id);
 
       // driver_locations — internal tracking table
       const locResult = await supabase.from(TABLE_LOCATIONS).upsert(
         {
-          driver_id:  user.id,
+          driver_id:  cachedUserId,
           lat, lng,
           heading:    location.coords.heading ?? 0,
           speed:      location.coords.speed   ?? 0,
@@ -129,9 +120,8 @@ async function startForegroundTracking() {
       // drivers — GPS tick only updates position + last_seen, never touches online
       const drvResult = await supabase.from(TABLE_DRIVERS)
         .update({ lat, lng, last_seen: now })
-        .eq(DRIVER_COLS.id, user.id);
-      if (drvResult.error) console.warn('[GPS] drivers update error:', drvResult.error.message, drvResult.error.details);
-      else console.log('[GPS] drivers updated ok');
+        .eq(DRIVER_COLS.id, cachedUserId);
+      if (drvResult.error) console.warn('[GPS] drivers update error:', drvResult.error.message);
 
     } catch (e) { console.warn('[GPS] Write error:', e.message); }
   }
@@ -181,6 +171,7 @@ export function DriverProvider({ children }) {
   const channelRef      = useRef(null);
   const activeTripIdRef = useRef(null);
   const isDemoRef       = useRef(false);
+  const userIdRef       = useRef(null); // cached once on goOnline — avoids getUser() on every GPS tick
 
   // ─── Shift timer ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -278,16 +269,7 @@ export function DriverProvider({ children }) {
   async function goOnline() {
     setDriverState(DRIVER_STATE.SCANNING);
 
-    // Location runs independently — a failure here must never block the subscription
-    try {
-      const backgroundStarted = await startLocationTracking();
-      if (!backgroundStarted) startForegroundTracking();
-    } catch (e) {
-      console.warn('[DriverContext] Location start error:', e.message);
-      try { startForegroundTracking(); } catch {}
-    }
-
-    // Get auth user
+    // Get auth user first — needed for GPS caching and subscriptions
     let user = null;
     try {
       const result = await supabase.auth.getUser();
@@ -299,11 +281,27 @@ export function DriverProvider({ children }) {
     if (!user) {
       // Demo mode
       isDemoRef.current = true;
+      try {
+        const backgroundStarted = await startLocationTracking();
+        if (!backgroundStarted) startForegroundTracking(null);
+      } catch (e) { try { startForegroundTracking(null); } catch {} }
       clearTimeout(scanTimeoutRef.current);
       scanTimeoutRef.current = setTimeout(() => {
         setDriverState(prev => prev === DRIVER_STATE.SCANNING ? DRIVER_STATE.TRIPS : prev);
       }, 3000);
       return;
+    }
+
+    // Cache user ID — reused by GPS polling, markNoShow, cancelTrip, completeTrip
+    userIdRef.current = user.id;
+
+    // Start GPS with cached ID (avoids getUser() on every 5s tick)
+    try {
+      const backgroundStarted = await startLocationTracking();
+      if (!backgroundStarted) startForegroundTracking(user.id);
+    } catch (e) {
+      console.warn('[DriverContext] Location start error:', e.message);
+      try { startForegroundTracking(user.id); } catch {}
     }
 
     // Real mode — subscribe first, then log shift
@@ -348,6 +346,7 @@ export function DriverProvider({ children }) {
     setPendingTrip(null);
     setAvailableTrips([]);
     activeTripIdRef.current = null;
+    userIdRef.current = null;
 
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
@@ -437,15 +436,17 @@ export function DriverProvider({ children }) {
     setActiveTrip(null);
     setDriverState(DRIVER_STATE.SCANNING);
     if (!isDemoRef.current && tripId) {
+      // Trip update has no user dependency — do it first so it always succeeds
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        await supabase.from(TABLE_TRIPS)
-          .update({ [TRIP_COLS.status]: 'no_show' })
-          .eq(TRIP_COLS.id, tripId);
-        if (user) await supabase.from(TABLE_DRIVERS)
-          .update({ [DRIVER_COLS.status]: 'available' })
-          .eq(DRIVER_COLS.id, user.id);
-      } catch (e) { console.warn('[DriverContext] markNoShow error:', e.message); }
+        await supabase.from(TABLE_TRIPS).update({ [TRIP_COLS.status]: 'no_show' }).eq(TRIP_COLS.id, tripId);
+      } catch (e) { console.warn('[DriverContext] markNoShow trip error:', e.message); }
+      // Driver status update uses cached ID
+      const uid = userIdRef.current;
+      if (uid) {
+        try {
+          await supabase.from(TABLE_DRIVERS).update({ [DRIVER_COLS.status]: 'available' }).eq(DRIVER_COLS.id, uid);
+        } catch (e) { console.warn('[DriverContext] markNoShow driver error:', e.message); }
+      }
     }
   }
 
@@ -457,17 +458,16 @@ export function DriverProvider({ children }) {
     setDriverState(DRIVER_STATE.SCANNING);
     if (!isDemoRef.current && tripId) {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
         await supabase.from(TABLE_TRIPS)
-          .update({
-            [TRIP_COLS.status]:       'cancelled',
-            [TRIP_COLS.cancelReason]: reason,
-          })
+          .update({ [TRIP_COLS.status]: 'cancelled', [TRIP_COLS.cancelReason]: reason })
           .eq(TRIP_COLS.id, tripId);
-        if (user) await supabase.from(TABLE_DRIVERS)
-          .update({ [DRIVER_COLS.status]: 'available' })
-          .eq(DRIVER_COLS.id, user.id);
-      } catch (e) { console.warn('[DriverContext] cancelTrip error:', e.message); }
+      } catch (e) { console.warn('[DriverContext] cancelTrip trip error:', e.message); }
+      const uid = userIdRef.current;
+      if (uid) {
+        try {
+          await supabase.from(TABLE_DRIVERS).update({ [DRIVER_COLS.status]: 'available' }).eq(DRIVER_COLS.id, uid);
+        } catch (e) { console.warn('[DriverContext] cancelTrip driver error:', e.message); }
+      }
     }
   }
 

@@ -1,5 +1,14 @@
 // Shared date / time utilities used across screens
 
+// Format seconds → MM:SS or HH:MM:SS (used for shift timer and trip timer)
+export function formatTime(s) {
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+  return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+}
+
 export function relativeTime(iso) {
   if (!iso) return '';
   const diff  = Date.now() - new Date(iso).getTime();
