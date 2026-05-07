@@ -90,45 +90,57 @@ async function startForegroundTracking(cachedUserId) {
 
   isTracking = true;
 
+  // Track last sent position to skip redundant updates when stationary
+  let lastLat = null;
+  let lastLng = null;
+  const MIN_DISTANCE_METRES = 5; // only push if driver moved > 5m
+
+  function metresBetween(lat1, lng1, lat2, lng2) {
+    const R = 6371000;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
   async function pushLocation() {
-    if (!isTracking) return; // shift ended mid-flight — discard
+    if (!isTracking) return;
     try {
       const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
+        accuracy: Location.Accuracy.High,
       });
-      if (!isTracking) return; // ended while waiting for GPS
+      if (!isTracking) return;
+
+      const lat     = location.coords.latitude;
+      const lng     = location.coords.longitude;
+      const heading = location.coords.heading ?? 0;
+      const speed   = Math.max(0, location.coords.speed ?? 0);
+
+      // Skip update if driver hasn't moved (avoids jitter when stationary)
+      if (lastLat !== null && metresBetween(lastLat, lastLng, lat, lng) < MIN_DISTANCE_METRES) return;
+      lastLat = lat;
+      lastLng = lng;
 
       const now = new Date().toISOString();
-      const lat = location.coords.latitude;
-      const lng = location.coords.longitude;
 
-
-      // driver_locations — internal tracking table
-      const locResult = await supabase.from(TABLE_LOCATIONS).upsert(
-        {
-          driver_id:  cachedUserId,
-          lat, lng,
-          heading:    location.coords.heading ?? 0,
-          speed:      location.coords.speed   ?? 0,
-          is_online:  true,
-          updated_at: now,
-        },
-        { onConflict: 'driver_id' }
-      );
-      if (locResult.error) console.warn('[GPS] driver_locations error:', locResult.error.message);
-
-      // drivers — GPS tick only updates position + last_seen, never touches online
-      const drvResult = await supabase.from(TABLE_DRIVERS)
-        .update({ lat, lng, last_seen: now })
-        .eq(DRIVER_COLS.id, cachedUserId);
-      if (drvResult.error) console.warn('[GPS] drivers update error:', drvResult.error.message);
+      // Parallel writes — both tables updated simultaneously
+      await Promise.all([
+        supabase.from(TABLE_LOCATIONS).upsert(
+          { driver_id: cachedUserId, lat, lng, heading, speed, is_online: true, updated_at: now },
+          { onConflict: 'driver_id' }
+        ),
+        // Include heading + speed so CRM can animate smoothly and rotate marker
+        supabase.from(TABLE_DRIVERS)
+          .update({ lat, lng, last_seen: now, heading, speed })
+          .eq(DRIVER_COLS.id, cachedUserId),
+      ]);
 
     } catch (e) { console.warn('[GPS] Write error:', e.message); }
   }
 
-  // Fire immediately then every 5 seconds
+  // Fire immediately then every 2 seconds (smoother CRM map updates)
   pushLocation();
-  foregroundInterval = setInterval(pushLocation, 5000);
+  foregroundInterval = setInterval(pushLocation, 2000);
   console.log('[GPS] Foreground tracking started');
 }
 
