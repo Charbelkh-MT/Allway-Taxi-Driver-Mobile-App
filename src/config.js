@@ -108,9 +108,12 @@ export const TRIP_COLS = {
   status:        'status',
   paymentMethod: 'payment_method',
   allowDebt:     'allow_debt',
-  cancelReason:  'cancel_reason',
-  createdAt:     'requested_at',
+  cancelReason:       'cancel_reason',
+  rideType:           'ride_type',
+  preferredDriverId:  'preferred_driver_id',
+  createdAt:          'requested_at',
   // Trip status values: 'pending' | 'accepted' | 'picked_up' | 'completed' | 'no_show' | 'cancelled'
+  // ride_type values: 'comfort' | 'xl'
 };
 
 // Column map for the `drivers` table

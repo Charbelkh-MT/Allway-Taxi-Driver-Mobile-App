@@ -29,6 +29,11 @@ export default function TripCard({ trip }) {
         </View>
         <View style={styles.right}>
           {!!trip.fare && <Text style={[styles.fare, { color: colors.yellow }]}>{trip.fare}</Text>}
+          {trip.rideType === 'xl' && (
+            <View style={[styles.chip, { backgroundColor: `${colors.yellow}15`, borderColor: `${colors.yellow}30` }]}>
+              <Text style={[styles.chipText, { color: colors.yellow }]}>XL</Text>
+            </View>
+          )}
           <View style={[styles.chip, { backgroundColor: `${accent}15`, borderColor: `${accent}30` }]}>
             <Text style={[styles.chipText, { color: accent }]}>{s.label}</Text>
           </View>

@@ -8,7 +8,16 @@ import { formatTime } from '../utils/dateUtils';
 import { FONTS, RADIUS } from '../theme';
 import PaymentModal from './PaymentModal';
 
-const PAYMENT_LABELS = { cash: '💵 Cash', card: '💳 Card', debt: '📋 Account' };
+function formatPaymentLabel(method) {
+  if (!method) return '';
+  if (method.startsWith('split|')) {
+    const [, m1, a1, m2, a2] = method.split('|');
+    const icons = { cash: '💵', card: '💳', wish: '💙', wallet: '💰', debt: '📋' };
+    return `${icons[m1] ?? '💵'} $${parseFloat(a1).toFixed(0)}  +  ${icons[m2] ?? '💳'} $${parseFloat(a2).toFixed(0)}`;
+  }
+  const LABELS = { cash: '💵 Cash', card: '💳 Card', wish: '💙 Wish', wallet: '💰 Wallet', debt: '📋 Account' };
+  return LABELS[method] ?? method;
+}
 
 // ─── Success overlay ──────────────────────────────────────────────────────────
 function TripSuccessOverlay({ visible, trip, paymentMethod, onDone }) {
@@ -45,7 +54,7 @@ function TripSuccessOverlay({ visible, trip, paymentMethod, onDone }) {
           <View style={[successStyles.fareRow, { backgroundColor: `${colors.yellow}12`, borderColor: `${colors.yellow}30` }]}>
             <Text style={[successStyles.fare,    { color: colors.yellow }]}>{trip?.fare}</Text>
             <Text style={[successStyles.payment, { color: colors.textMuted }]}>
-              {PAYMENT_LABELS[paymentMethod] ?? paymentMethod}
+              {formatPaymentLabel(paymentMethod)}
             </Text>
           </View>
           <Text style={[successStyles.sub, { color: colors.textDisabled }]}>
@@ -150,16 +159,28 @@ export default function ActiveTrip({ trip, onComplete, onPickUp, onNoShow, onCan
     <View style={styles.container}>
       <View style={[styles.card, { backgroundColor: `${colors.green}14`, borderColor: `${colors.green}40` }]}>
 
-        {/* Status badge + elapsed timer */}
+        {/* Status badge + ride type + elapsed timer */}
         <View style={styles.badgeRow}>
           <View style={[styles.dot, { backgroundColor: colors.green }]} />
           <Text style={[styles.badgeText, { color: colors.green, flex: 1 }]}>
             {isPickedUp ? t('passengerOnBoard') : t('headingToPickup')}
           </Text>
+          {trip.rideType === 'xl' && (
+            <View style={[styles.rideTypeBadge, { backgroundColor: `${colors.yellow}20`, borderColor: `${colors.yellow}50` }]}>
+              <Text style={[styles.rideTypeText, { color: colors.yellow }]}>{t('rideXL')}</Text>
+            </View>
+          )}
           <View style={[styles.timerChip, { backgroundColor: `${colors.green}20`, borderColor: `${colors.green}40` }]}>
             <Text style={[styles.timerText, { color: colors.green }]}>⏱ {formatTime(elapsed)}</Text>
           </View>
         </View>
+
+        {/* Preferred driver banner */}
+        {trip.isPreferred && (
+          <View style={[styles.preferredBanner, { backgroundColor: `${colors.yellow}15`, borderColor: `${colors.yellow}40` }]}>
+            <Text style={[styles.preferredText, { color: colors.yellow }]}>{t('preferredDriver')}</Text>
+          </View>
+        )}
 
         {/* Customer */}
         <Text style={[styles.customerName, { color: colors.textPrimary }]}>
@@ -308,11 +329,15 @@ const styles = StyleSheet.create({
   container:    { paddingHorizontal: 18, paddingTop: 20 },
   card:         { borderWidth: 1, borderRadius: RADIUS.xxl, padding: 20 },
 
-  badgeRow:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
-  dot:          { width: 8, height: 8, borderRadius: 4 },
-  badgeText:    { fontSize: 10, fontFamily: FONTS.extraBold, letterSpacing: 1.2 },
-  timerChip:    { borderWidth: 1, borderRadius: 10, paddingVertical: 3, paddingHorizontal: 10 },
-  timerText:    { fontSize: 12, fontFamily: FONTS.black, fontVariant: ['tabular-nums'] },
+  badgeRow:       { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  dot:            { width: 8, height: 8, borderRadius: 4 },
+  badgeText:      { fontSize: 10, fontFamily: FONTS.extraBold, letterSpacing: 1.2 },
+  rideTypeBadge:  { borderWidth: 1, borderRadius: 6, paddingVertical: 2, paddingHorizontal: 7 },
+  rideTypeText:   { fontSize: 9, fontFamily: FONTS.black, letterSpacing: 0.8 },
+  timerChip:      { borderWidth: 1, borderRadius: 10, paddingVertical: 3, paddingHorizontal: 10 },
+  timerText:      { fontSize: 12, fontFamily: FONTS.black, fontVariant: ['tabular-nums'] },
+  preferredBanner:{ borderWidth: 1, borderRadius: RADIUS.md, paddingVertical: 6, paddingHorizontal: 12, marginBottom: 10, alignSelf: 'flex-start' },
+  preferredText:  { fontSize: 11, fontFamily: FONTS.extraBold, letterSpacing: 0.3 },
 
   customerName: { fontSize: 22, fontFamily: FONTS.black, marginBottom: 10 },
   phoneChip:    { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 12, marginBottom: 18 },

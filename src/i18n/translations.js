@@ -69,14 +69,31 @@ export const translations = {
     openMaps:         '🗺  Google Maps',
 
     // ── Payment ─────────────────────────────────────────────
-    paymentMethod:   'Payment Method',
-    cash:            'Cash',
-    cashSub:         'Customer pays in cash',
-    card:            'Card',
-    cardSub:         'Customer pays by card',
-    debt:            'Account (Debt)',
-    debtSub:         'Added to customer account · paid later',
-    cancel:          'Cancel',
+    paymentMethod:      'Payment Method',
+    cash:               'Cash',
+    cashSub:            'Customer pays in cash',
+    card:               'Card',
+    cardSub:            'Customer pays by card',
+    wish:               'Wish',
+    wishSub:            'Customer pays via Wish app',
+    wallet:             'Wallet',
+    walletSub:          'Customer pays via OMT / digital wallet',
+    debt:               'Account (Debt)',
+    debtSub:            'Added to customer account · paid later',
+    cancel:             'Cancel',
+    splitPayment:       'Split Payment',
+    splitPaymentSub:    'Two methods on one order',
+    firstPayment:       'First Payment',
+    secondPayment:      'Second Payment',
+    remaining:          'Remaining',
+    enterAmount:        'Amount',
+    confirmSplit:       '✓  Confirm Split Payment',
+    splitInvalid:       'First amount must be between $1 and the total fare.',
+
+    // ── Ride type & preferred driver ─────────────────────────
+    rideComfort:        'COMFORT',
+    rideXL:             'XL',
+    preferredDriver:    '⭐  Customer Requested You',
 
     // ── Trip completed ──────────────────────────────────────
     tripCompleted:    'Trip Completed!',
@@ -117,7 +134,10 @@ export const translations = {
     completedAt:       'Completed',
     paymentCash:       '💵 Cash',
     paymentCard:       '💳 Card',
+    paymentWish:       '💙 Wish',
+    paymentWallet:     '💰 Wallet',
     paymentDebt:       '📋 Account (Debt)',
+    paymentSplit:      '🔀 Split',
 
     // ── Account screen ──────────────────────────────────────
     myAccount:         'My Account',
@@ -257,14 +277,31 @@ export const translations = {
     openMaps:         '🗺  خرائط جوجل',
 
     // ── Payment ─────────────────────────────────────────────
-    paymentMethod:   'طريقة الدفع',
-    cash:            'نقداً',
-    cashSub:         'الزبون يدفع نقداً',
-    card:            'بطاقة',
-    cardSub:         'الزبون يدفع ببطاقة',
-    debt:            'حساب آجل',
-    debtSub:         'يُضاف إلى حساب الزبون · يُدفع لاحقاً',
-    cancel:          'إلغاء',
+    paymentMethod:      'طريقة الدفع',
+    cash:               'نقداً',
+    cashSub:            'الزبون يدفع نقداً',
+    card:               'بطاقة',
+    cardSub:            'الزبون يدفع ببطاقة',
+    wish:               'Wish',
+    wishSub:            'الزبون يدفع عبر تطبيق Wish',
+    wallet:             'محفظة',
+    walletSub:          'الزبون يدفع عبر OMT أو محفظة رقمية',
+    debt:               'حساب آجل',
+    debtSub:            'يُضاف إلى حساب الزبون · يُدفع لاحقاً',
+    cancel:             'إلغاء',
+    splitPayment:       'دفع مقسّم',
+    splitPaymentSub:    'طريقتان على طلب واحد',
+    firstPayment:       'الدفعة الأولى',
+    secondPayment:      'الدفعة الثانية',
+    remaining:          'المتبقي',
+    enterAmount:        'المبلغ',
+    confirmSplit:       '✓  تأكيد الدفع المقسّم',
+    splitInvalid:       'يجب أن يكون المبلغ الأول بين $١ والأجرة الكاملة.',
+
+    // ── Ride type & preferred driver ─────────────────────────
+    rideComfort:        'COMFORT',
+    rideXL:             'XL',
+    preferredDriver:    '⭐  طلبك الزبون تحديداً',
 
     // ── Trip completed ──────────────────────────────────────
     tripCompleted:    'تمّت الرحلة!',
@@ -305,7 +342,10 @@ export const translations = {
     completedAt:       'اكتملت',
     paymentCash:       '💵 نقداً',
     paymentCard:       '💳 بطاقة',
+    paymentWish:       '💙 Wish',
+    paymentWallet:     '💰 محفظة',
     paymentDebt:       '📋 حساب آجل',
+    paymentSplit:      '🔀 مقسّم',
 
     // ── Account screen ──────────────────────────────────────
     myAccount:         'حسابي',

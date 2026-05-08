@@ -20,16 +20,20 @@ const MAX_DISPATCH_RANGE_KM = 10;
 const DriverContext = createContext(null);
 
 export const DEMO_TRIP = {
-  id:           'trip_001',
-  customer:     'Ahmad K.',
-  customerFull: 'Ahmad Khoury',
-  phone:        '+961 71 234 567',
-  pickup:       'Hamra, Beirut',
-  dropoff:      'ABC Mall, Dbayeh',
-  fare:         '$22',
-  dist:         '14 km',
-  pickupLat:    null,
-  pickupLng:    null,
+  id:              'trip_001',
+  customer:        'Ahmad K.',
+  customerFull:    'Ahmad Khoury',
+  phone:           '+961 71 234 567',
+  pickup:          'Hamra, Beirut',
+  dropoff:         'ABC Mall, Dbayeh',
+  fare:            '$22',
+  fareNum:         22,
+  dist:            '14 km',
+  pickupLat:       null,
+  pickupLng:       null,
+  rideType:        'comfort',
+  isPreferred:     false,
+  allowDebt:       false,
 };
 
 export const DEMO_AVAILABLE_TRIPS = [
@@ -60,96 +64,81 @@ function haversineKm(lat1, lon1, lat2, lon2) {
 }
 
 function normalizeTrip(row) {
-  const name  = row[TRIP_COLS.customerName] ?? 'Customer';
-  const first = name.split(' ')[0];
-  const fare  = row[TRIP_COLS.fare]       != null ? `$${Number(row[TRIP_COLS.fare]).toFixed(0)}`         : '$0';
-  const dist  = row[TRIP_COLS.distanceKm] != null ? `${Number(row[TRIP_COLS.distanceKm]).toFixed(1)} km` : '';
+  const name    = row[TRIP_COLS.customerName] ?? 'Customer';
+  const first   = name.split(' ')[0];
+  const fareNum = row[TRIP_COLS.fare] != null ? Number(row[TRIP_COLS.fare]) : 0;
+  const fare    = fareNum > 0 ? `$${fareNum.toFixed(0)}` : '$0';
+  const dist    = row[TRIP_COLS.distanceKm] != null ? `${Number(row[TRIP_COLS.distanceKm]).toFixed(1)} km` : '';
   return {
-    id:           row[TRIP_COLS.id] ?? row.id,
-    customer:     `${first}.`,
-    customerFull: name,
-    phone:        row[TRIP_COLS.customerPhone] ?? '',
-    pickup:       row[TRIP_COLS.pickupAddress]  ?? '',
-    dropoff:      row[TRIP_COLS.dropoffAddress] ?? '',
-    pickupLat:    row[TRIP_COLS.pickupLat]  ?? null,
-    pickupLng:    row[TRIP_COLS.pickupLng]  ?? null,
+    id:                row[TRIP_COLS.id] ?? row.id,
+    customer:          `${first}.`,
+    customerFull:      name,
+    phone:             row[TRIP_COLS.customerPhone]   ?? '',
+    pickup:            row[TRIP_COLS.pickupAddress]   ?? '',
+    dropoff:           row[TRIP_COLS.dropoffAddress]  ?? '',
+    pickupLat:         row[TRIP_COLS.pickupLat]       ?? null,
+    pickupLng:         row[TRIP_COLS.pickupLng]       ?? null,
     fare,
+    fareNum,
     dist,
-    allowDebt: row[TRIP_COLS.allowDebt] === true,
+    allowDebt:         row[TRIP_COLS.allowDebt] === true,
+    rideType:          row[TRIP_COLS.rideType]         ?? 'comfort',
+    preferredDriverId: row[TRIP_COLS.preferredDriverId] ?? null,
+    isPreferred:       false, // set by markPreferred after auth user is known
   };
 }
 
+function markPreferred(trips, userId) {
+  if (!userId) return trips;
+  return trips.map(t => ({ ...t, isPreferred: t.preferredDriverId === userId }));
+}
+
 // ─── Foreground location watcher (Expo Go fallback) ───────────────────────────
-let foregroundInterval = null;
-let isTracking        = false;
+// Uses watchPositionAsync so the OS delivers locations on a reliable 2s cadence.
+// This avoids the blocking delay of getCurrentPositionAsync + setInterval, which
+// caused effective send rates of 3-4s in practice.
+let locationSubscription = null;
 
 async function startForegroundTracking(cachedUserId) {
   const { status } = await Location.requestForegroundPermissionsAsync();
   if (status !== 'granted') { console.warn('[GPS] Permission denied'); return; }
-  if (foregroundInterval) return;
+  if (locationSubscription) return;
 
-  isTracking = true;
+  locationSubscription = await Location.watchPositionAsync(
+    {
+      accuracy:         Location.Accuracy.BestForNavigation,
+      timeInterval:     2000, // minimum ms between updates
+      distanceInterval: 0,    // fire even when stationary so dashboard stays live
+    },
+    async (location) => {
+      if (!locationSubscription) return;
+      try {
+        const { latitude: lat, longitude: lng } = location.coords;
+        const heading = location.coords.heading ?? 0;
+        const speed   = Math.max(0, location.coords.speed ?? 0);
+        const now     = new Date().toISOString();
 
-  // Track last sent position to skip redundant updates when stationary
-  let lastLat = null;
-  let lastLng = null;
-  const MIN_DISTANCE_METRES = 5; // only push if driver moved > 5m
+        await Promise.all([
+          supabase.from(TABLE_LOCATIONS).upsert(
+            { driver_id: cachedUserId, lat, lng, heading, speed, is_online: true, updated_at: now },
+            { onConflict: 'driver_id' }
+          ),
+          supabase.from(TABLE_DRIVERS)
+            .update({ lat, lng, last_seen: now, heading, speed })
+            .eq(DRIVER_COLS.id, cachedUserId),
+        ]);
+      } catch (e) { console.warn('[GPS] Write error:', e.message); }
+    }
+  );
 
-  function metresBetween(lat1, lng1, lat2, lng2) {
-    const R = 6371000;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLng = (lng2 - lng1) * Math.PI / 180;
-    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  }
-
-  async function pushLocation() {
-    if (!isTracking) return;
-    try {
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
-      if (!isTracking) return;
-
-      const lat     = location.coords.latitude;
-      const lng     = location.coords.longitude;
-      const heading = location.coords.heading ?? 0;
-      const speed   = Math.max(0, location.coords.speed ?? 0);
-
-      // Skip update if driver hasn't moved (avoids jitter when stationary)
-      if (lastLat !== null && metresBetween(lastLat, lastLng, lat, lng) < MIN_DISTANCE_METRES) return;
-      lastLat = lat;
-      lastLng = lng;
-
-      const now = new Date().toISOString();
-
-      // Parallel writes — both tables updated simultaneously
-      await Promise.all([
-        supabase.from(TABLE_LOCATIONS).upsert(
-          { driver_id: cachedUserId, lat, lng, heading, speed, is_online: true, updated_at: now },
-          { onConflict: 'driver_id' }
-        ),
-        // Include heading + speed so CRM can animate smoothly and rotate marker
-        supabase.from(TABLE_DRIVERS)
-          .update({ lat, lng, last_seen: now, heading, speed })
-          .eq(DRIVER_COLS.id, cachedUserId),
-      ]);
-
-    } catch (e) { console.warn('[GPS] Write error:', e.message); }
-  }
-
-  // Fire immediately then every 2 seconds (smoother CRM map updates)
-  pushLocation();
-  foregroundInterval = setInterval(pushLocation, 2000);
-  console.log('[GPS] Foreground tracking started');
+  console.log('[GPS] Foreground watch started (2s)');
 }
 
 async function stopForegroundTracking() {
-  isTracking = false;
-  if (foregroundInterval) {
-    clearInterval(foregroundInterval);
-    foregroundInterval = null;
-    console.log('[GPS] Foreground tracking stopped');
+  if (locationSubscription) {
+    locationSubscription.remove();
+    locationSubscription = null;
+    console.log('[GPS] Foreground watch stopped');
   }
   try {
     const { data: { user } } = await supabase.auth.getUser();
@@ -219,7 +208,7 @@ export function DriverProvider({ children }) {
         .select('*')
         .eq(TRIP_COLS.status, 'pending')
         .is(TRIP_COLS.driverId, null);
-      setAvailableTrips((data ?? []).map(normalizeTrip));
+      setAvailableTrips(markPreferred((data ?? []).map(normalizeTrip), userIdRef.current));
     } catch (e) { console.warn('[DriverContext] syncPendingTrips error:', e.message); }
   }
 
@@ -267,8 +256,9 @@ export function DriverProvider({ children }) {
           // TODO: re-enable range filter before production
           // if (trip.pickupLat && trip.pickupLng) { ... }
 
+          const markedTrip = markPreferred([trip], userIdRef.current)[0];
           setAvailableTrips(prev =>
-            prev.find(t => t.id === trip.id) ? prev : [trip, ...prev]
+            prev.find(t => t.id === markedTrip.id) ? prev : [markedTrip, ...prev]
           );
           sendTripNotification(trip);
           openTripSheet(trip, true); // realtime → play sound
@@ -334,7 +324,7 @@ export function DriverProvider({ children }) {
         .select('*')
         .eq(TRIP_COLS.status, 'pending')
         .is(TRIP_COLS.driverId, null);
-      setAvailableTrips((data ?? []).map(normalizeTrip));
+      setAvailableTrips(markPreferred((data ?? []).map(normalizeTrip), user.id));
     } catch (e) { console.warn('[DriverContext] fetchPending error:', e.message); }
 
     try {

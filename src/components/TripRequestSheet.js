@@ -78,7 +78,7 @@ export default function TripRequestSheet({ trip, onAccept, onDecline, withSound 
               <View style={[styles.timerFill, { width: `${pct * 100}%`, backgroundColor: barColor }]} />
             </View>
 
-            {/* Header: logo + title + countdown */}
+            {/* Header: logo + title + ride type + countdown */}
             <View style={styles.header}>
               <Image
                 source={require('../../assets/allway-main-logo.jpg')}
@@ -86,7 +86,14 @@ export default function TripRequestSheet({ trip, onAccept, onDecline, withSound 
                 resizeMode="cover"
               />
               <View style={styles.headerCenter}>
-                <Text style={[styles.headerTitle, { color: colors.yellow }]}>NEW TRIP</Text>
+                <View style={styles.headerTitleRow}>
+                  <Text style={[styles.headerTitle, { color: colors.yellow }]}>NEW TRIP</Text>
+                  {trip.rideType === 'xl' && (
+                    <View style={[styles.rideTypeBadge, { backgroundColor: `${colors.yellow}22`, borderColor: `${colors.yellow}60` }]}>
+                      <Text style={[styles.rideTypeText, { color: colors.yellow }]}>XL</Text>
+                    </View>
+                  )}
+                </View>
                 <Text style={[styles.headerSub, { color: colors.textMuted }]}>Request incoming</Text>
               </View>
               <View style={[styles.countdownBadge, { backgroundColor: `${barColor}18`, borderColor: `${barColor}55` }]}>
@@ -94,6 +101,13 @@ export default function TripRequestSheet({ trip, onAccept, onDecline, withSound 
                 <Text style={[styles.countdownSec, { color: barColor }]}>sec</Text>
               </View>
             </View>
+
+            {/* Preferred driver banner */}
+            {trip.isPreferred && (
+              <View style={[styles.preferredBanner, { backgroundColor: `${colors.yellow}15`, borderColor: `${colors.yellow}40` }]}>
+                <Text style={[styles.preferredText, { color: colors.yellow }]}>{t('preferredDriver')}</Text>
+              </View>
+            )}
 
             {/* Addresses — big and clear */}
             <View style={[styles.addressBlock, { backgroundColor: isDark ? '#1a1a1a' : '#f7f7f7', borderColor: colors.border }]}>
@@ -174,11 +188,16 @@ const styles = StyleSheet.create({
   timerFill:    { height: '100%' },
 
   // Header
-  header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 14, gap: 12 },
-  logo:         { width: 80, height: 36, borderRadius: 8 },
-  headerCenter: { flex: 1 },
-  headerTitle:  { fontSize: 20, fontFamily: FONTS.black, letterSpacing: 0.5 },
-  headerSub:    { fontSize: 11, fontFamily: FONTS.semiBold, marginTop: 1 },
+  header:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 14, gap: 12 },
+  logo:           { width: 80, height: 36, borderRadius: 8 },
+  headerCenter:   { flex: 1 },
+  headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerTitle:    { fontSize: 20, fontFamily: FONTS.black, letterSpacing: 0.5 },
+  rideTypeBadge:  { borderWidth: 1.5, borderRadius: 6, paddingVertical: 2, paddingHorizontal: 8 },
+  rideTypeText:   { fontSize: 11, fontFamily: FONTS.black, letterSpacing: 1 },
+  headerSub:      { fontSize: 11, fontFamily: FONTS.semiBold, marginTop: 1 },
+  preferredBanner:{ marginHorizontal: 14, marginBottom: 8, borderWidth: 1, borderRadius: RADIUS.lg, paddingVertical: 8, paddingHorizontal: 14, alignItems: 'center' },
+  preferredText:  { fontSize: 12, fontFamily: FONTS.extraBold, letterSpacing: 0.3 },
   countdownBadge:{ alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderRadius: 12, paddingVertical: 6, paddingHorizontal: 10, minWidth: 52 },
   countdownNum: { fontSize: 22, fontFamily: FONTS.black, lineHeight: 26 },
   countdownSec: { fontSize: 10, fontFamily: FONTS.bold, marginTop: -2 },
