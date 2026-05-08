@@ -1,5 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
 export async function sendTripNotification(trip) {
   try {
@@ -52,12 +53,14 @@ export async function registerForPushNotificationsAsync() {
     });
   }
 
-  // Push tokens require a valid EAS projectId and a real device build.
-  // In Expo Go this will always fail — we swallow the error silently.
   try {
-    const token = (await Notifications.getExpoPushTokenAsync()).data;
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+    if (!projectId) { console.warn('[Push] No projectId found in app config'); return null; }
+    const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+    console.log('[Push] Token registered:', token);
     return token;
-  } catch {
+  } catch (e) {
+    console.warn('[Push] getExpoPushTokenAsync failed:', e.message);
     return null;
   }
 }

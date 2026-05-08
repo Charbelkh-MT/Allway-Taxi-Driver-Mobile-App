@@ -1,11 +1,18 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { Alert } from 'react-native';
 import * as Location from 'expo-location';
+import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../utils/supabase';
-import { startLocationTracking, stopLocationTracking } from '../utils/locationTask';
+import { startLocationTracking, stopLocationTracking, LOCATION_TASK_NAME } from '../utils/locationTask';
 import { TABLE_SHIFTS, TABLE_LOCATIONS, TABLE_TRIPS, TABLE_DRIVERS, TRIP_COLS, DRIVER_COLS } from '../config';
 import { sendTripNotification } from '../utils/notifications';
 import { formatTime } from '../utils/dateUtils';
+
+// In Expo Go, background location tasks crash — use foreground-only tracking
+const IS_EXPO_GO = Constants.appOwnership === 'expo';
+
+const SHIFT_STORAGE_KEY = 'allway_active_shift';
 
 export const DRIVER_STATE = {
   OFFLINE:  'offline',
@@ -106,7 +113,7 @@ async function startForegroundTracking(cachedUserId) {
 
   locationSubscription = await Location.watchPositionAsync(
     {
-      accuracy:         Location.Accuracy.BestForNavigation,
+      accuracy:         Location.Accuracy.High,
       timeInterval:     2000, // minimum ms between updates
       distanceInterval: 0,    // fire even when stationary so dashboard stays live
     },
@@ -117,6 +124,8 @@ async function startForegroundTracking(cachedUserId) {
         const heading = location.coords.heading ?? 0;
         const speed   = Math.max(0, location.coords.speed ?? 0);
         const now     = new Date().toISOString();
+
+        console.log(`[GPS] lat=${lat.toFixed(6)}  lng=${lng.toFixed(6)}  heading=${heading.toFixed(1)}°  speed=${speed.toFixed(1)}m/s`);
 
         await Promise.all([
           supabase.from(TABLE_LOCATIONS).upsert(
@@ -182,7 +191,8 @@ export function DriverProvider({ children }) {
       startTimeRef.current = null;
       setShiftSeconds(0);
     } else if (!timerRef.current) {
-      startTimeRef.current = Date.now();
+      // Don't overwrite startTimeRef if already set by shift restore
+      if (!startTimeRef.current) startTimeRef.current = Date.now();
       timerRef.current = setInterval(() => {
         setShiftSeconds(Math.floor((Date.now() - startTimeRef.current) / 1000));
       }, 1000);
@@ -195,6 +205,50 @@ export function DriverProvider({ children }) {
       clearTimeout(scanTimeoutRef.current);
       if (channelRef.current) supabase.removeChannel(channelRef.current);
     };
+  }, []);
+
+  // ─── Restore shift on app reopen ──────────────────────────────────────────────
+  useEffect(() => {
+    async function restoreShiftIfActive() {
+      try {
+        // Check if background GPS task is still running from a previous session
+        const isTracking = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME).catch(() => false);
+        if (!isTracking) return;
+
+        const saved = await AsyncStorage.getItem(SHIFT_STORAGE_KEY);
+        if (!saved) return;
+
+        const { userId, shiftId, startTime } = JSON.parse(saved);
+        if (!userId) return;
+
+        // Restore refs — set startTimeRef before setDriverState so timer picks it up
+        userIdRef.current       = userId;
+        currentShiftRef.current = shiftId ?? null;
+        isDemoRef.current       = false;
+        startTimeRef.current    = startTime;
+
+        setDriverState(DRIVER_STATE.SCANNING);
+        subscribeToTrips(userId);
+
+        // Re-mark online in CRM in case it was cleared
+        await supabase.from(TABLE_DRIVERS)
+          .update({ online: true, [DRIVER_COLS.status]: 'available' })
+          .eq(DRIVER_COLS.id, userId);
+
+        // Fetch any pending trips
+        const { data } = await supabase
+          .from(TABLE_TRIPS)
+          .select('*')
+          .eq(TRIP_COLS.status, 'pending')
+          .is(TRIP_COLS.driverId, null);
+        setAvailableTrips(markPreferred((data ?? []).map(normalizeTrip), userId));
+
+        console.log('[DriverContext] Shift restored from background — elapsed:', Math.floor((Date.now() - startTime) / 1000), 's');
+      } catch (e) {
+        console.warn('[DriverContext] Shift restore error:', e.message);
+      }
+    }
+    restoreShiftIfActive();
   }, []);
 
   // ─── Realtime: subscribe to ALL new pending trips ─────────────────────────────
@@ -283,10 +337,9 @@ export function DriverProvider({ children }) {
     if (!user) {
       // Demo mode
       isDemoRef.current = true;
-      try {
-        const backgroundStarted = await startLocationTracking();
-        if (!backgroundStarted) startForegroundTracking(null);
-      } catch (e) { try { startForegroundTracking(null); } catch {} }
+      try { await startForegroundTracking(null); } catch (e) {
+        console.warn('[DriverContext] Demo GPS start error:', e.message);
+      }
       clearTimeout(scanTimeoutRef.current);
       scanTimeoutRef.current = setTimeout(() => {
         setDriverState(prev => prev === DRIVER_STATE.SCANNING ? DRIVER_STATE.TRIPS : prev);
@@ -297,13 +350,20 @@ export function DriverProvider({ children }) {
     // Cache user ID — reused by GPS polling, markNoShow, cancelTrip, completeTrip
     userIdRef.current = user.id;
 
-    // Start GPS with cached ID (avoids getUser() on every 5s tick)
+    // Expo Go: skip background task entirely — it crashes Expo Go
+    // EAS native build: attempt background task, fall back to foreground if unavailable
     try {
-      const backgroundStarted = await startLocationTracking();
-      if (!backgroundStarted) startForegroundTracking(user.id);
+      if (IS_EXPO_GO) {
+        await startForegroundTracking(user.id);
+      } else {
+        const backgroundStarted = await startLocationTracking();
+        if (backgroundStarted !== true) await startForegroundTracking(user.id);
+      }
     } catch (e) {
-      console.warn('[DriverContext] Location start error:', e.message);
-      try { startForegroundTracking(user.id); } catch {}
+      console.warn('[DriverContext] GPS start error:', e.message);
+      try { await startForegroundTracking(user.id); } catch (e2) {
+        console.warn('[DriverContext] Foreground fallback failed:', e2.message);
+      }
     }
 
     // Real mode — subscribe first, then log shift
@@ -337,6 +397,15 @@ export function DriverProvider({ children }) {
     } catch (e) {
       console.warn('[DriverContext] Shift log error:', e.message);
     }
+
+    // Persist shift state so it can be restored if the app is fully closed
+    try {
+      await AsyncStorage.setItem(SHIFT_STORAGE_KEY, JSON.stringify({
+        userId:    user.id,
+        shiftId:   currentShiftRef.current,
+        startTime: startTimeRef.current ?? Date.now(),
+      }));
+    } catch (e) { console.warn('[DriverContext] Shift save error:', e.message); }
   }
 
   // ─── Go offline ───────────────────────────────────────────────────────────────
@@ -367,6 +436,9 @@ export function DriverProvider({ children }) {
         currentShiftRef.current = null;
       }
     } catch (e) { console.warn('[DriverContext] Shift end error:', e.message); }
+
+    // Clear persisted shift so restore doesn't fire on next app open
+    try { await AsyncStorage.removeItem(SHIFT_STORAGE_KEY); } catch {}
   }
 
   // ─── Accept trip (atomic claim — first driver wins) ───────────────────────────

@@ -22,6 +22,11 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
   if (!data?.locations?.length) return;
 
   const loc = data.locations[0];
+  const { latitude: lat, longitude: lng } = loc.coords;
+  const heading = loc.coords.heading ?? 0;
+  const speed   = Math.max(0, loc.coords.speed ?? 0);
+
+  console.log(`[GPS] lat=${lat.toFixed(6)}  lng=${lng.toFixed(6)}  heading=${heading.toFixed(1)}°  speed=${speed.toFixed(1)}m/s`);
 
   // Get the currently authenticated driver — safe to call in background context
   const { data: { user } } = await supabase.auth.getUser();
@@ -30,10 +35,10 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
   await supabase.from(TABLE_LOCATIONS).upsert(
     {
       driver_id:  user.id,
-      lat:        loc.coords.latitude,
-      lng:        loc.coords.longitude,
-      heading:    loc.coords.heading  ?? 0,
-      speed:      loc.coords.speed    ?? 0,
+      lat,
+      lng,
+      heading,
+      speed,
       is_online:  true,
       updated_at: new Date().toISOString(),
     },
@@ -63,7 +68,7 @@ export async function startLocationTracking() {
 
   try {
     await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
-      accuracy:                         Location.Accuracy.BestForNavigation,
+      accuracy:                         Location.Accuracy.High,
       timeInterval:                     2000,
       distanceInterval:                 0,
       pausesUpdatesAutomatically:       false,

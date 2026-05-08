@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "819762005595",
+    "project_id": "allway-taxi-a73cb",
+    "storage_bucket": "allway-taxi-a73cb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:819762005595:android:6e9d4b2e0ab6ebae4fe17e",
+        "android_client_info": {
+          "package_name": "com.allwaytaxi.driver"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC8J_b0CghV11rYnwVQwRzXzFTTUWqF474"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
