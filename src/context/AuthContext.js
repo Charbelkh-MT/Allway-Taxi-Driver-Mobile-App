@@ -78,6 +78,7 @@ export function AuthProvider({ children }) {
       totalTrips: Number(data[DRIVER_COLS.totalTrips]) || 0,
       acceptRate: Number(data[DRIVER_COLS.acceptRate]) || 100,
       photoUrl:   data[DRIVER_COLS.photoUrl]   ?? null,
+      carType:    data[DRIVER_COLS.carType]    ?? 'comfort',
       initial:    (data[DRIVER_COLS.name] ?? 'D')[0].toUpperCase(),
     });
   }
@@ -92,6 +93,7 @@ export function AuthProvider({ children }) {
           DRIVER_COLS.vehicle, DRIVER_COLS.plate, DRIVER_COLS.rating,
           DRIVER_COLS.totalTrips, DRIVER_COLS.acceptRate,
           DRIVER_COLS.pushToken, DRIVER_COLS.photoUrl, DRIVER_COLS.status,
+          DRIVER_COLS.carType,
         ].join(', '))
         .eq(DRIVER_COLS.id, authUserId)
         .single();

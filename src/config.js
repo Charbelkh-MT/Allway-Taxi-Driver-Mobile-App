@@ -89,6 +89,8 @@ export const TABLE_TRIPS     = 'trips';
 export const TABLE_DRIVERS   = 'drivers';
 export const TABLE_LOCATIONS = 'driver_locations';
 export const TABLE_SHIFTS    = 'driver_shifts';
+export const TABLE_INCIDENTS = 'incidents';
+export const BUCKET_INCIDENTS = 'incident-recordings';
 
 // Column map for the `trips` table
 export const TRIP_COLS = {
@@ -107,10 +109,12 @@ export const TRIP_COLS = {
   distanceKm:    'distance_km',
   status:        'status',
   paymentMethod: 'payment_method',
-  allowDebt:     'allow_debt',
+  allowDebt:          'allow_debt',
   cancelReason:       'cancel_reason',
   rideType:           'ride_type',
   preferredDriverId:  'preferred_driver_id',
+  passengerCount:     'passenger_count',
+  dispatchTimeoutAt:  'dispatch_timeout_at',
   createdAt:          'requested_at',
   // Trip status values: 'pending' | 'accepted' | 'picked_up' | 'completed' | 'no_show' | 'cancelled'
   // ride_type values: 'comfort' | 'xl'
@@ -129,4 +133,5 @@ export const DRIVER_COLS = {
   pushToken:   'push_token',
   photoUrl:    'photo_url',
   status:      'status',
+  carType:     'car_type',
 };

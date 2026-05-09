@@ -13,6 +13,10 @@ import { FONTS, RADIUS } from '../theme';
 const COUNTDOWN_MAX = 84;
 
 function getInitialCountdown(trip) {
+  // Prefer dispatch_timeout_at from CRM (authoritative) over local calculation
+  if (trip?.dispatchTimeoutAt) {
+    return Math.max(0, Math.round((new Date(trip.dispatchTimeoutAt) - Date.now()) / 1000));
+  }
   if (!trip?.createdAt) return COUNTDOWN_MAX;
   const elapsed = Math.floor((Date.now() - new Date(trip.createdAt).getTime()) / 1000);
   return Math.max(0, COUNTDOWN_MAX - elapsed);
@@ -161,6 +165,22 @@ export default function TripRequestSheet({ trip, onAccept, onDecline, withSound 
               </View>
             </View>
 
+            {/* Passenger count + credit flag badges */}
+            {(trip.passengerCount > 1 || trip.allowDebt) && (
+              <View style={styles.badgeRow}>
+                {trip.passengerCount > 1 && (
+                  <View style={[styles.infoBadge, { backgroundColor: `${colors.yellow}15`, borderColor: `${colors.yellow}40` }]}>
+                    <Text style={[styles.infoBadgeText, { color: colors.yellow }]}>👥  {trip.passengerCount} passengers</Text>
+                  </View>
+                )}
+                {trip.allowDebt && (
+                  <View style={[styles.infoBadge, { backgroundColor: `${colors.red}15`, borderColor: `${colors.red}40` }]}>
+                    <Text style={[styles.infoBadgeText, { color: colors.red }]}>📋  Credit Account</Text>
+                  </View>
+                )}
+              </View>
+            )}
+
             {/* Buttons */}
             <View style={[styles.buttons, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <TouchableOpacity
@@ -227,6 +247,11 @@ const styles = StyleSheet.create({
   infoCard:     { flex: 1, borderWidth: 1, borderRadius: RADIUS.lg, paddingVertical: 12, alignItems: 'center' },
   infoValue:    { fontSize: 17, fontFamily: FONTS.black, marginBottom: 3 },
   infoLabel:    { fontSize: 9, fontFamily: FONTS.extraBold, letterSpacing: 0.8 },
+
+  // Badges row
+  badgeRow:      { flexDirection: 'row', gap: 8, marginHorizontal: 14, marginBottom: 12, flexWrap: 'wrap' },
+  infoBadge:     { borderWidth: 1, borderRadius: 20, paddingVertical: 5, paddingHorizontal: 12 },
+  infoBadgeText: { fontSize: 11, fontFamily: FONTS.extraBold },
 
   // Buttons
   buttons:      { flexDirection: 'row', gap: 10, marginHorizontal: 14, marginBottom: 20 },

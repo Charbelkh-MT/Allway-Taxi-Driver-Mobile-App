@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../utils/supabase';
 import { startLocationTracking, stopLocationTracking, LOCATION_TASK_NAME } from '../utils/locationTask';
 import { TABLE_SHIFTS, TABLE_LOCATIONS, TABLE_TRIPS, TABLE_DRIVERS, TRIP_COLS, DRIVER_COLS } from '../config';
+import { useAuth } from './AuthContext';
 import { sendTripNotification } from '../utils/notifications';
 import { formatTime } from '../utils/dateUtils';
 
@@ -90,11 +91,13 @@ function normalizeTrip(row) {
     fare,
     fareNum,
     dist,
-    allowDebt:         row[TRIP_COLS.allowDebt] === true,
-    rideType:          row[TRIP_COLS.rideType]          ?? 'comfort',
-    preferredDriverId: row[TRIP_COLS.preferredDriverId] ?? null,
-    isPreferred:       false,
-    createdAt:         row[TRIP_COLS.createdAt]          ?? null,
+    allowDebt:          row[TRIP_COLS.allowDebt] === true,
+    rideType:           row[TRIP_COLS.rideType]          ?? 'comfort',
+    preferredDriverId:  row[TRIP_COLS.preferredDriverId] ?? null,
+    isPreferred:        false,
+    passengerCount:     Number(row[TRIP_COLS.passengerCount]) || 1,
+    dispatchTimeoutAt:  row[TRIP_COLS.dispatchTimeoutAt]  ?? null,
+    createdAt:          row[TRIP_COLS.createdAt]           ?? null,
   };
 }
 
@@ -169,6 +172,8 @@ async function stopForegroundTracking() {
 }
 
 export function DriverProvider({ children }) {
+  const { driver } = useAuth();
+
   const [driverState, setDriverState]       = useState(DRIVER_STATE.OFFLINE);
   const [activeTrip, setActiveTrip]         = useState(null);
   const [pendingTrip, setPendingTrip]       = useState(null);
@@ -183,6 +188,7 @@ export function DriverProvider({ children }) {
   const currentShiftRef = useRef(null);
   const channelRef      = useRef(null);
   const activeTripIdRef = useRef(null);
+  const carTypeRef      = useRef('comfort'); // updated on goOnline from driver profile
   const isDemoRef       = useRef(false);
   const userIdRef       = useRef(null);
 
@@ -362,7 +368,8 @@ export function DriverProvider({ children }) {
         .from(TABLE_TRIPS)
         .select('*')
         .eq(TRIP_COLS.status, 'pending')
-        .is(TRIP_COLS.driverId, null);
+        .is(TRIP_COLS.driverId, null)
+        .eq(TRIP_COLS.rideType, carTypeRef.current);
       setAvailableTrips(markPreferred((data ?? []).map(normalizeTrip), userIdRef.current));
     } catch (e) { console.warn('[DriverContext] syncPendingTrips error:', e.message); }
   }
@@ -403,8 +410,9 @@ export function DriverProvider({ children }) {
             return;
           }
 
-          // INSERT: only react to new unclaimed pending trips
+          // INSERT: only react to new unclaimed pending trips matching driver's car type
           if (status !== 'pending' || driverId) return;
+          if (row[TRIP_COLS.rideType] && row[TRIP_COLS.rideType] !== carTypeRef.current) return;
 
           const trip = normalizeTrip(row);
 
@@ -447,8 +455,9 @@ export function DriverProvider({ children }) {
       return;
     }
 
-    // Cache user ID — reused by GPS polling, markNoShow, cancelTrip, completeTrip
+    // Cache user ID and car type for trip filtering
     userIdRef.current = user.id;
+    carTypeRef.current = driver?.carType ?? 'comfort';
 
     // Expo Go: skip background task entirely — it crashes Expo Go
     // EAS native build: attempt background task, fall back to foreground if unavailable
@@ -477,13 +486,14 @@ export function DriverProvider({ children }) {
         .eq(DRIVER_COLS.id, user.id);
     } catch (e) { console.warn('[DriverContext] online mark error:', e.message); }
 
-    // Fetch any trips already pending before we came online
+    // Fetch any trips already pending before we came online — filtered by driver's car type
     try {
       const { data } = await supabase
         .from(TABLE_TRIPS)
         .select('*')
         .eq(TRIP_COLS.status, 'pending')
-        .is(TRIP_COLS.driverId, null);
+        .is(TRIP_COLS.driverId, null)
+        .eq(TRIP_COLS.rideType, carTypeRef.current);
       setAvailableTrips(markPreferred((data ?? []).map(normalizeTrip), user.id));
     } catch (e) { console.warn('[DriverContext] fetchPending error:', e.message); }
 
