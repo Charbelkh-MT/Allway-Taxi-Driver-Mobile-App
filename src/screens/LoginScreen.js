@@ -169,13 +169,6 @@ export default function LoginScreen() {
           </View>
         </Animated.View>
 
-        <TouchableOpacity
-          onPress={async () => { await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); demoLogin(); }}
-          activeOpacity={0.7}
-          style={[styles.demoBtn, { borderColor: colors.yellowFaint, backgroundColor: colors.yellowFaint }]}
-        >
-          <Text style={[styles.demoBtnText, { color: colors.yellow }]}>{t('tryDemo')}</Text>
-        </TouchableOpacity>
       </ScrollView>
 
       {/* ── Login success overlay ── */}

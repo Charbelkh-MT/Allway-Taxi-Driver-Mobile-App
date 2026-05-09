@@ -12,6 +12,12 @@ import { FONTS, RADIUS } from '../theme';
 
 const COUNTDOWN_MAX = 84;
 
+function getInitialCountdown(trip) {
+  if (!trip?.createdAt) return COUNTDOWN_MAX;
+  const elapsed = Math.floor((Date.now() - new Date(trip.createdAt).getTime()) / 1000);
+  return Math.max(0, COUNTDOWN_MAX - elapsed);
+}
+
 async function playTripSound() {
   try {
     // Only plays if the local file exists — haptics fire regardless
@@ -25,7 +31,7 @@ async function playTripSound() {
 export default function TripRequestSheet({ trip, onAccept, onDecline, withSound = false }) {
   const { colors, isDark } = useTheme();
   const { t, isRTL } = useLanguage();
-  const [countdown, setCountdown] = useState(COUNTDOWN_MAX);
+  const [countdown, setCountdown] = useState(() => getInitialCountdown(trip));
   const scaleAnim   = useRef(new Animated.Value(0.82)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const intervalRef = useRef(null);
@@ -41,7 +47,11 @@ export default function TripRequestSheet({ trip, onAccept, onDecline, withSound 
     if (withSound) playTripSound();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
 
-    // Countdown
+    // If time already expired by the time driver opens app, auto-decline immediately
+    const initial = getInitialCountdown(trip);
+    if (initial <= 0) { onDecline(); return; }
+
+    // Countdown from remaining time
     intervalRef.current = setInterval(() => {
       setCountdown(prev => {
         if (prev <= 1) { clearInterval(intervalRef.current); onDecline(); return 0; }

@@ -191,13 +191,19 @@ export default function HomeScreen() {
       )}
 
       {/* Floating available trips button — opens the trip popup */}
-      {isOnline && availableTrips.length > 0 && !showTripSheet && driverState !== DRIVER_STATE.ACTIVE && (
-        <Animated.View style={[styles.floatWrap, { transform: [{ scale: pulseAnim }] }]}>
+      {isOnline && availableTrips.filter(t => !t.createdAt || (Date.now() - new Date(t.createdAt).getTime()) / 1000 < 84).length > 0 && !showTripSheet && driverState !== DRIVER_STATE.ACTIVE && (
+        <Animated.View collapsable={false} style={[styles.floatWrap, { transform: [{ scale: pulseAnim }] }]}>
           <TouchableOpacity
             style={[styles.floatBtn, { backgroundColor: colors.yellow }]}
             onPress={() => {
-              if (availableTrips.length === 1) {
-                openTripSheet(availableTrips[0]);
+              // Filter out expired trips before acting
+              const validTrips = availableTrips.filter(t => {
+                if (!t.createdAt) return true;
+                return (Date.now() - new Date(t.createdAt).getTime()) / 1000 < 84;
+              });
+              if (validTrips.length === 0) return; // all expired, cleanup will remove them
+              if (validTrips.length === 1) {
+                openTripSheet(validTrips[0]);
               } else {
                 setShowAvailableSheet(true);
               }
@@ -273,7 +279,7 @@ const styles = StyleSheet.create({
   container:      { flex: 1 },
   scroll:         { flex: 1 },
   scrollContent:  { paddingBottom: Platform.OS === 'ios' ? 140 : 32 },
-  floatWrap:      { position: 'absolute', bottom: 130, alignSelf: 'center', left: 0, right: 0, alignItems: 'center', zIndex: 50 },
+  floatWrap:      { position: 'absolute', bottom: 12, alignSelf: 'center', left: 0, right: 0, alignItems: 'center', zIndex: 50 },
   floatBtn:       { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 26, paddingVertical: 13, paddingHorizontal: 20, shadowColor: '#F5B800', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.45, shadowRadius: 12, elevation: 8 },
   floatIcon:      { fontSize: 16 },
   floatText:      { fontSize: 13, fontFamily: FONTS.black, color: '#000' },

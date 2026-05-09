@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { Alert } from 'react-native';
 import * as Location from 'expo-location';
+import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../utils/supabase';
@@ -89,9 +90,10 @@ function normalizeTrip(row) {
     fareNum,
     dist,
     allowDebt:         row[TRIP_COLS.allowDebt] === true,
-    rideType:          row[TRIP_COLS.rideType]         ?? 'comfort',
+    rideType:          row[TRIP_COLS.rideType]          ?? 'comfort',
     preferredDriverId: row[TRIP_COLS.preferredDriverId] ?? null,
-    isPreferred:       false, // set by markPreferred after auth user is known
+    isPreferred:       false,
+    createdAt:         row[TRIP_COLS.createdAt]          ?? null,
   };
 }
 
@@ -181,7 +183,7 @@ export function DriverProvider({ children }) {
   const channelRef      = useRef(null);
   const activeTripIdRef = useRef(null);
   const isDemoRef       = useRef(false);
-  const userIdRef       = useRef(null); // cached once on goOnline — avoids getUser() on every GPS tick
+  const userIdRef       = useRef(null);
 
   // ─── Shift timer ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -206,6 +208,25 @@ export function DriverProvider({ children }) {
       if (channelRef.current) supabase.removeChannel(channelRef.current);
     };
   }, []);
+
+  // ─── Periodic cleanup: remove expired or claimed trips from availableTrips ─────
+  useEffect(() => {
+    if (driverState === DRIVER_STATE.OFFLINE) return;
+
+    const cleanup = setInterval(async () => {
+      // Remove trips older than 84 seconds (countdown expired)
+      setAvailableTrips(prev => prev.filter(t => {
+        if (!t.createdAt) return true;
+        const elapsed = (Date.now() - new Date(t.createdAt).getTime()) / 1000;
+        return elapsed < 84;
+      }));
+
+      // Also re-sync from DB to catch trips claimed by other drivers
+      await syncPendingTrips();
+    }, 8000);
+
+    return () => clearInterval(cleanup);
+  }, [driverState]);
 
   // ─── Restore shift on app reopen ──────────────────────────────────────────────
   useEffect(() => {
@@ -249,6 +270,42 @@ export function DriverProvider({ children }) {
       }
     }
     restoreShiftIfActive();
+  }, []);
+
+  // ─── Notification tap handler ─────────────────────────────────────────────────
+  async function handleNotificationTap(tripId) {
+    try {
+      const { data } = await supabase
+        .from(TABLE_TRIPS)
+        .select('*')
+        .eq(TRIP_COLS.id, tripId)
+        .single();
+      if (!data || data[TRIP_COLS.status] !== 'pending') return;
+      const trip       = normalizeTrip(data);
+      const markedTrip = markPreferred([trip], userIdRef.current)[0];
+      openTripSheet(markedTrip, false);
+    } catch (e) {
+      console.warn('[Notification] handleNotificationTap:', e.message);
+    }
+  }
+
+  useEffect(() => {
+    // Foreground / background tap
+    const sub = Notifications.addNotificationResponseReceivedListener(response => {
+      const tripId = response.notification.request.content.data?.tripId;
+      if (tripId) handleNotificationTap(tripId);
+    });
+
+    // App launched from fully closed via notification tap
+    Notifications.getLastNotificationResponseAsync().then(response => {
+      const tripId = response?.notification.request.content.data?.tripId;
+      if (tripId) {
+        // Delay to let shift restore complete first
+        setTimeout(() => handleNotificationTap(tripId), 1500);
+      }
+    });
+
+    return () => sub.remove();
   }, []);
 
   // ─── Realtime: subscribe to ALL new pending trips ─────────────────────────────
@@ -406,6 +463,7 @@ export function DriverProvider({ children }) {
         startTime: startTimeRef.current ?? Date.now(),
       }));
     } catch (e) { console.warn('[DriverContext] Shift save error:', e.message); }
+
   }
 
   // ─── Go offline ───────────────────────────────────────────────────────────────
@@ -439,6 +497,7 @@ export function DriverProvider({ children }) {
 
     // Clear persisted shift so restore doesn't fire on next app open
     try { await AsyncStorage.removeItem(SHIFT_STORAGE_KEY); } catch {}
+
   }
 
   // ─── Accept trip (atomic claim — first driver wins) ───────────────────────────

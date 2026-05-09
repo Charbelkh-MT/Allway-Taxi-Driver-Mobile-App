@@ -10,7 +10,7 @@ export async function sendTripNotification(trip) {
         body: `${trip.pickup} → ${trip.dropoff}  ·  ${trip.fare}`,
         data: { tripId: trip.id },
         sound: true,
-        ...(Platform.OS === 'android' && { channelId: 'trip-requests' }),
+        ...(Platform.OS === 'android' && { channelId: 'trip-alerts-v2' }),
       },
       trigger: null,
     });
@@ -40,16 +40,20 @@ export async function registerForPushNotificationsAsync() {
   if (finalStatus !== 'granted') return null;
 
   if (Platform.OS === 'android') {
-    Notifications.setNotificationChannelAsync('trip-requests', {
-      name: 'Trip Requests',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#F5B800',
-      sound: true,
+    await Notifications.setNotificationChannelAsync('trip-alerts-v2', {
+      name:             'Trip Alerts',
+      importance:       Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 300, 200, 300],
+      lightColor:       '#F5B800',
+      sound:            'default',
+      enableLights:     true,
+      enableVibrate:    true,
+      showBadge:        true,
     });
-    Notifications.setNotificationChannelAsync('general', {
-      name: 'General',
+    await Notifications.setNotificationChannelAsync('general-v2', {
+      name:       'General',
       importance: Notifications.AndroidImportance.DEFAULT,
+      sound:      'default',
     });
   }
 

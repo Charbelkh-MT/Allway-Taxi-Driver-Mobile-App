@@ -25,20 +25,26 @@ export function AuthProvider({ children }) {
 
   // ─── Auth state listener ─────────────────────────────────────────────────────
   useEffect(() => {
+    // Safety net — if loading takes more than 10s, force past it
+    const safetyTimer = setTimeout(() => {
+      setIsLoading(prev => { if (prev) { console.warn('[Auth] Loading timeout — forcing past loading screen'); } return false; });
+    }, 10000);
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) fetchDriverProfile(session.user.id);
-      else setIsLoading(false);
-    }).catch(() => setIsLoading(false));
+      else { clearTimeout(safetyTimer); setIsLoading(false); }
+    }).catch(() => { clearTimeout(safetyTimer); setIsLoading(false); });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (isDemoRef.current) return;
       if (session?.user) {
-        // Re-fetch profile on sign-in or token refresh
-        if (_event === 'SIGNED_IN' || _event === 'TOKEN_REFRESHED' || _event === 'INITIAL_SESSION') {
+        // Only re-fetch on explicit sign-in or token refresh — not INITIAL_SESSION
+        // (getSession() above already handles the initial load)
+        if (_event === 'SIGNED_IN' || _event === 'TOKEN_REFRESHED') {
           fetchDriverProfile(session.user.id);
         }
       } else if (_event === 'SIGNED_OUT') {
-        // Only log out on an explicit sign-out, not transient connection events
+        clearTimeout(safetyTimer);
         unsubscribeProfile();
         setDriver(FALLBACK_DRIVER);
         setIsAuthenticated(false);
@@ -47,6 +53,7 @@ export function AuthProvider({ children }) {
     });
 
     return () => {
+      clearTimeout(safetyTimer);
       subscription.unsubscribe();
       unsubscribeProfile();
     };
