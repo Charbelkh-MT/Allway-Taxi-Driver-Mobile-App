@@ -44,8 +44,8 @@ function fmt(s) {
   return `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
 }
 
-// ─── Waveform ─────────────────────────────────────────────────────────────────
-function Waveform({ levels, color }) {
+// ─── Recording waveform (live bars while recording) ──────────────────────────
+function RecordingWaveform({ levels, color }) {
   return (
     <View style={waveStyles.container}>
       {levels.map((lvl, i) => (
@@ -54,9 +54,48 @@ function Waveform({ levels, color }) {
     </View>
   );
 }
+
+// ─── WhatsApp-style playback waveform ────────────────────────────────────────
+function PlaybackWaveform({ levels, progress, color, dimColor, onSeek }) {
+  const containerRef = useRef(null);
+  const [width, setWidth] = useState(0);
+
+  const playedCount = Math.round(progress * BAR_COUNT);
+
+  return (
+    <View
+      ref={containerRef}
+      style={waveStyles.container}
+      onLayout={e => setWidth(e.nativeEvent.layout.width)}
+    >
+      {levels.map((lvl, i) => {
+        const played  = i < playedCount;
+        const isHead  = i === playedCount;
+        return (
+          <View key={i} style={{ alignItems: 'center', justifyContent: 'center' }}>
+            {/* Moving circle playhead */}
+            {isHead && (
+              <View style={[waveStyles.playhead, { backgroundColor: color }]} />
+            )}
+            <View style={[
+              waveStyles.bar,
+              {
+                height:          Math.max(3, lvl * 42),
+                backgroundColor: played ? color : dimColor,
+                opacity:         played ? 1 : 0.35,
+              },
+            ]} />
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 const waveStyles = StyleSheet.create({
-  container: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 50, paddingHorizontal: 4 },
+  container: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 56, paddingHorizontal: 4 },
   bar:       { width: 3, borderRadius: 2, minHeight: 3 },
+  playhead:  { width: 12, height: 12, borderRadius: 6, position: 'absolute', zIndex: 10 },
 });
 
 // ─── Selector chips ───────────────────────────────────────────────────────────
@@ -102,6 +141,7 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
   const [recordingUri,  setRecordingUri]  = useState(null);
   const [duration,      setDuration]      = useState(0);
   const [isPlaying,     setIsPlaying]     = useState(false);
+  const [playProgress,  setPlayProgress]  = useState(0);
   const [sent,          setSent]          = useState(false);
   const [isSending,     setIsSending]     = useState(false);
   const [levels,        setLevels]        = useState(Array(BAR_COUNT).fill(0));
@@ -181,23 +221,43 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
     try {
       if (soundRef.current) { await soundRef.current.unloadAsync(); soundRef.current = null; }
       await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true });
-      const { sound } = await Audio.Sound.createAsync({ uri: recordingUri }, { shouldPlay: true });
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: recordingUri },
+        { shouldPlay: true, progressUpdateIntervalMillis: 50 }
+      );
       soundRef.current = sound;
       setIsPlaying(true);
-      sound.setOnPlaybackStatusUpdate(s => {
-        if (s.didJustFinish) { setIsPlaying(false); sound.unloadAsync(); soundRef.current = null; }
+      setPlayProgress(0);
+
+      sound.setOnPlaybackStatusUpdate(status => {
+        if (!status.isLoaded) return;
+        if (status.durationMillis) {
+          setPlayProgress(status.positionMillis / status.durationMillis);
+        }
+        if (status.didJustFinish) {
+          setIsPlaying(false);
+          setPlayProgress(0);
+          sound.unloadAsync();
+          soundRef.current = null;
+        }
       });
     } catch (e) { console.warn('[Playback]:', e.message); }
   }
 
   async function stopPlayback() {
-    if (soundRef.current) { await soundRef.current.stopAsync(); await soundRef.current.unloadAsync(); soundRef.current = null; }
+    if (soundRef.current) {
+      await soundRef.current.stopAsync();
+      await soundRef.current.unloadAsync();
+      soundRef.current = null;
+    }
     setIsPlaying(false);
+    setPlayProgress(0);
   }
 
   function resetRecording() {
     setRecordingUri(null);
     setDuration(0);
+    setPlayProgress(0);
     setLevels(Array(BAR_COUNT).fill(0));
     setSavedLevels(Array(BAR_COUNT).fill(0));
     levelsRef.current = Array(BAR_COUNT).fill(0);
@@ -312,14 +372,30 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
                 <Text style={[styles.timer, {
                   color: isRecording ? colors.red : recordingUri ? accentColor : colors.textDisabled,
                 }]}>{fmt(duration)}</Text>
-                <Waveform
-                  levels={recordingUri ? savedLevels : levels}
-                  color={isRecording ? colors.red : recordingUri ? accentColor : colors.border}
-                />
+
+                {/* Waveform — recording: live bars | playback: WhatsApp progress */}
+                {recordingUri ? (
+                  <PlaybackWaveform
+                    levels={savedLevels}
+                    progress={playProgress}
+                    color={accentColor}
+                    dimColor={colors.border}
+                  />
+                ) : (
+                  <RecordingWaveform
+                    levels={levels}
+                    color={isRecording ? colors.red : colors.border}
+                  />
+                )}
+
                 <Text style={[styles.waveLabel, {
                   color: isRecording ? colors.red : recordingUri ? accentColor : colors.textDisabled,
                 }]}>
-                  {isRecording ? t('recordingLabel') : isPlaying ? '▶  Playing…' : recordingUri ? t('recordedLabel') : ''}
+                  {isRecording
+                    ? t('recordingLabel')
+                    : isPlaying
+                    ? `▶  ${Math.round(playProgress * 100)}%`
+                    : recordingUri ? t('recordedLabel') : ''}
                 </Text>
               </View>
 
@@ -338,19 +414,23 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
                 </View>
               )}
 
-              {/* Playback + actions */}
+              {/* Playback + actions — WhatsApp style */}
               {!!recordingUri && (
                 <>
-                  <View style={styles.actionsRow}>
-                    <TouchableOpacity onPress={isPlaying ? stopPlayback : playBack} activeOpacity={0.8}
-                      style={[styles.actionBtn, { backgroundColor: colors.bgCard, borderColor: colors.border }]}>
-                      <Text style={[styles.actionBtnText, { color: colors.textPrimary }]}>
-                        {isPlaying ? t('stopPlay') : t('playBack')}
-                      </Text>
+                  <View style={styles.playbackRow}>
+                    {/* Circular play/pause button */}
+                    <TouchableOpacity
+                      onPress={isPlaying ? stopPlayback : playBack}
+                      activeOpacity={0.85}
+                      style={[styles.playCircle, { backgroundColor: accentColor }]}
+                    >
+                      <Text style={styles.playCircleIcon}>{isPlaying ? '⏸' : '▶'}</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={() => { stopPlayback(); resetRecording(); }} activeOpacity={0.8}
-                      style={[styles.actionBtn, { borderColor: colors.border }]}>
-                      <Text style={[styles.actionBtnText, { color: colors.textMuted }]}>{t('reRecord')}</Text>
+
+                    {/* Re-record button */}
+                    <TouchableOpacity onPress={() => { stopPlayback(); resetRecording(); }} activeOpacity={0.75}
+                      style={[styles.reRecordBtn, { borderColor: colors.border }]}>
+                      <Text style={[styles.reRecordText, { color: colors.textMuted }]}>🔄  {t('reRecord')}</Text>
                     </TouchableOpacity>
                   </View>
                   <TouchableOpacity onPress={handleSend} activeOpacity={0.85} disabled={isSending}
@@ -393,9 +473,11 @@ const styles = StyleSheet.create({
   recordBtn:     { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 30, paddingVertical: 18, paddingHorizontal: 32, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 12, elevation: 8 },
   recordBtnIcon: { fontSize: 22 },
   recordBtnText: { fontSize: 15, fontFamily: FONTS.black, color: '#000' },
-  actionsRow:    { flexDirection: 'row', gap: 10, marginBottom: 14 },
-  actionBtn:     { flex: 1, borderWidth: 1, borderRadius: RADIUS.lg, paddingVertical: 13, alignItems: 'center' },
-  actionBtnText: { fontSize: 14, fontFamily: FONTS.bold },
+  playbackRow:   { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 14 },
+  playCircle:    { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 6 },
+  playCircleIcon:{ fontSize: 20, color: '#000' },
+  reRecordBtn:   { flex: 1, borderWidth: 1, borderRadius: RADIUS.lg, paddingVertical: 13, alignItems: 'center' },
+  reRecordText:  { fontSize: 13, fontFamily: FONTS.bold },
   sendBtn:       { borderRadius: RADIUS.xl, paddingVertical: 18, alignItems: 'center', marginBottom: 8 },
   sendBtnText:   { fontSize: 15, fontFamily: FONTS.black },
   sentWrap:      { alignItems: 'center', paddingVertical: 32, gap: 14 },
