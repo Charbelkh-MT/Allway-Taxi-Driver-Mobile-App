@@ -115,6 +115,7 @@ export const TRIP_COLS = {
   preferredDriverId:  'preferred_driver_id',
   passengerCount:     'passenger_count',
   dispatchTimeoutAt:  'dispatch_timeout_at',
+  acceptedAt:         'accepted_at',
   createdAt:          'requested_at',
   // Trip status values: 'pending' | 'accepted' | 'picked_up' | 'completed' | 'no_show' | 'cancelled'
   // ride_type values: 'comfort' | 'xl'

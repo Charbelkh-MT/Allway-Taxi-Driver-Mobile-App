@@ -9,7 +9,6 @@ export async function sendTripNotification(trip) {
         title: '🚕 New Trip Request',
         body: `${trip.pickup} → ${trip.dropoff}  ·  ${trip.fare}`,
         data: { tripId: trip.id },
-        sound: true,
         ...(Platform.OS === 'android' && { channelId: 'trip-alerts-v2' }),
       },
       trigger: null,
@@ -75,7 +74,6 @@ export async function sendDemoTripNotification(trip) {
       title: '🚕 New Trip Request',
       body: `${trip.pickup} → ${trip.dropoff} · ${trip.fare}`,
       data: { tripId: trip.id },
-      sound: true,
     },
     trigger: null,
   });

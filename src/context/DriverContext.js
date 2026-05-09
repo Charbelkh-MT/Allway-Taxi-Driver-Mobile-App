@@ -548,9 +548,11 @@ export function DriverProvider({ children }) {
       }
     } catch (e) { console.warn('[DriverContext] Shift end error:', e.message); }
 
-    // Clear persisted shift so restore doesn't fire on next app open
-    try { await AsyncStorage.removeItem(SHIFT_STORAGE_KEY); } catch {}
-
+    // Clear all persisted state so restore doesn't fire on next app open
+    try {
+      await AsyncStorage.removeItem(SHIFT_STORAGE_KEY);
+      await AsyncStorage.removeItem(ACTIVE_TRIP_STORAGE_KEY);
+    } catch {}
   }
 
   // ─── Accept trip (atomic claim — first driver wins) ───────────────────────────

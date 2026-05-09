@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
-import { useDriver, DRIVER_STATE, DEMO_AVAILABLE_TRIPS } from '../context/DriverContext';
+import { useDriver, DRIVER_STATE } from '../context/DriverContext';
 import { FONTS, RADIUS } from '../theme';
 import { getWeekBounds } from '../utils/dateUtils';
 import AppHeader from '../components/AppHeader';
@@ -13,7 +13,6 @@ import ShiftCard from '../components/ShiftCard';
 import MiniEarningsChart from '../components/MiniEarningsChart';
 import QuickActions from '../components/QuickActions';
 import ScanningRadar from '../components/ScanningRadar';
-import AvailableTrips from '../components/AvailableTrips';
 import ActiveTrip from '../components/ActiveTrip';
 import AvailableTripsSheet from '../components/AvailableTripsSheet';
 import { registerForPushNotificationsAsync } from '../utils/notifications';
@@ -167,7 +166,6 @@ export default function HomeScreen() {
 
         {/* Online states */}
         {driverState === DRIVER_STATE.SCANNING && <FadeInView delay={160} distance={16}><ScanningRadar /></FadeInView>}
-        {driverState === DRIVER_STATE.TRIPS    && <FadeInView delay={160} distance={16}><AvailableTrips trips={DEMO_AVAILABLE_TRIPS} onAccept={acceptTrip} /></FadeInView>}
         {driverState === DRIVER_STATE.ACTIVE   && activeTrip && (
           <FadeInView delay={160} distance={16}>
             <ActiveTrip
