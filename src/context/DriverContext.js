@@ -193,8 +193,10 @@ export function DriverProvider({ children }) {
       timerRef.current     = null;
       startTimeRef.current = null;
       setShiftSeconds(0);
-    } else if (!timerRef.current) {
-      // Don't overwrite startTimeRef if already set by shift restore
+    } else {
+      // Always restart the interval on any non-offline state transition
+      // so the timer never gets stuck after completing or cancelling a trip
+      clearInterval(timerRef.current);
       if (!startTimeRef.current) startTimeRef.current = Date.now();
       timerRef.current = setInterval(() => {
         setShiftSeconds(Math.floor((Date.now() - startTimeRef.current) / 1000));
@@ -413,8 +415,7 @@ export function DriverProvider({ children }) {
           setAvailableTrips(prev =>
             prev.find(t => t.id === markedTrip.id) ? prev : [markedTrip, ...prev]
           );
-          sendTripNotification(trip);
-          openTripSheet(trip, true); // realtime → play sound
+          openTripSheet(trip, true); // realtime → play in-app sound only (push notification handles external alert)
         }
       )
       .subscribe((status) => console.log('[Realtime] dispatch channel:', status));
@@ -584,8 +585,10 @@ export function DriverProvider({ children }) {
     setAvailableTrips(prev => prev.filter(t => t.id !== resolved.id));
 
     // Persist active trip so it survives app being fully closed
+    // Include acceptedAt so the trip timer can resume from the correct time
     try {
-      await AsyncStorage.setItem(ACTIVE_TRIP_STORAGE_KEY, JSON.stringify(resolved));
+      const tripToSave = { ...resolved, acceptedAt: new Date().toISOString() };
+      await AsyncStorage.setItem(ACTIVE_TRIP_STORAGE_KEY, JSON.stringify(tripToSave));
     } catch (e) { console.warn('[DriverContext] Save active trip error:', e.message); }
 
     // Update CRM status to on_trip

@@ -23,7 +23,7 @@ Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowBanner: true,
     shouldShowList:   true,
-    shouldPlaySound:  true,
+    shouldPlaySound:  false, // in-app audio (trip-alert.mp3) handles sound — suppressing push sound prevents collision
     shouldSetBadge:   true,
   }),
 });

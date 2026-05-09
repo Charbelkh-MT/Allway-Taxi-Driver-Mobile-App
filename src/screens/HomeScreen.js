@@ -131,10 +131,10 @@ export default function HomeScreen() {
         trips={weeklyData.trips}
         bars={weeklyData.bars}
         todayIndex={weeklyData.todayIndex}
-        empty={driverState === DRIVER_STATE.OFFLINE}
+        empty={false}
       />
     );
-  }, [earningsLoading, weeklyData, driverState]);
+  }, [earningsLoading, weeklyData]);
 
   const isActive  = driverState === DRIVER_STATE.ACTIVE;
   const showChart = driverState !== DRIVER_STATE.ACTIVE;
@@ -155,6 +155,7 @@ export default function HomeScreen() {
             loading={earningsLoading}
           />
         </FadeInView>
+        {/* Shift card — always at top */}
         <FadeInView delay={80} distance={16}>
           <ShiftCard
             online={isOnline}
@@ -164,6 +165,7 @@ export default function HomeScreen() {
           />
         </FadeInView>
 
+        {/* Online states */}
         {driverState === DRIVER_STATE.SCANNING && <FadeInView delay={160} distance={16}><ScanningRadar /></FadeInView>}
         {driverState === DRIVER_STATE.TRIPS    && <FadeInView delay={160} distance={16}><AvailableTrips trips={DEMO_AVAILABLE_TRIPS} onAccept={acceptTrip} /></FadeInView>}
         {driverState === DRIVER_STATE.ACTIVE   && activeTrip && (
@@ -178,8 +180,9 @@ export default function HomeScreen() {
           </FadeInView>
         )}
 
+        {/* Analytics — always visible regardless of shift status */}
         {showChart && <FadeInView delay={160} distance={16}>{earningsChart}</FadeInView>}
-        {!isActive && <FadeInView delay={240} distance={16}><QuickActions /></FadeInView>}
+        {!isActive  && <FadeInView delay={240} distance={16}><QuickActions /></FadeInView>}
       </ScrollView>
 
       {showAvailableSheet && (

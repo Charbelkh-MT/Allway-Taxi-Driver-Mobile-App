@@ -22,44 +22,80 @@ function formatPaymentLabel(method) {
 // ─── Success overlay ──────────────────────────────────────────────────────────
 function TripSuccessOverlay({ visible, trip, paymentMethod, onDone }) {
   const { colors } = useTheme();
-  const { t } = useLanguage();
-  const scaleAnim   = useRef(new Animated.Value(0.7)).current;
+  const { t }      = useLanguage();
+  const scaleAnim   = useRef(new Animated.Value(0.75)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
+  const checkAnim   = useRef(new Animated.Value(0)).current;
+  const timerRef    = useRef(null);
 
   useEffect(() => {
     if (!visible) return;
+
     Animated.parallel([
-      Animated.spring(scaleAnim,   { toValue: 1, tension: 100, friction: 7, useNativeDriver: true }),
-      Animated.timing(opacityAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
-    ]).start();
-    const t = setTimeout(onDone, 4000);
-    return () => clearTimeout(t);
+      Animated.spring(scaleAnim,   { toValue: 1, tension: 80, friction: 8, useNativeDriver: true }),
+      Animated.timing(opacityAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
+    ]).start(() => {
+      Animated.spring(checkAnim, { toValue: 1, tension: 120, friction: 6, useNativeDriver: true }).start();
+    });
+
+    timerRef.current = setTimeout(onDone, 5000);
+    return () => clearTimeout(timerRef.current);
   }, [visible]);
+
+  function handleDone() {
+    clearTimeout(timerRef.current);
+    onDone();
+  }
 
   return (
     <Modal transparent visible={visible} animationType="none" statusBarTranslucent>
-      <View style={[successStyles.overlay, { backgroundColor: 'rgba(0,0,0,0.85)' }]}>
+      <View style={[successStyles.overlay, { backgroundColor: 'rgba(0,0,0,0.88)' }]}>
         <Animated.View style={[successStyles.card, {
           backgroundColor: colors.bg,
           transform: [{ scale: scaleAnim }],
           opacity: opacityAnim,
         }]}>
-          <View style={[successStyles.iconWrap, { backgroundColor: 'rgba(93,202,165,0.18)' }]}>
+
+          {/* Animated check icon */}
+          <Animated.View style={[
+            successStyles.iconWrap,
+            { backgroundColor: 'rgba(93,202,165,0.15)', borderColor: 'rgba(93,202,165,0.35)', transform: [{ scale: checkAnim }] },
+          ]}>
             <Text style={successStyles.icon}>✓</Text>
-          </View>
-          <Text style={[successStyles.title,    { color: colors.textPrimary }]}>{t('tripCompleted')}</Text>
+          </Animated.View>
+
+          {/* Title */}
+          <Text style={[successStyles.title, { color: colors.textPrimary }]}>{t('tripCompleted')}</Text>
+
+          {/* Customer name */}
           <Text style={[successStyles.customer, { color: colors.textMuted }]}>
             {trip?.customerFull || trip?.customer}
           </Text>
-          <View style={[successStyles.fareRow, { backgroundColor: `${colors.yellow}12`, borderColor: `${colors.yellow}30` }]}>
-            <Text style={[successStyles.fare,    { color: colors.yellow }]}>{trip?.fare}</Text>
-            <Text style={[successStyles.payment, { color: colors.textMuted }]}>
-              {formatPaymentLabel(paymentMethod)}
-            </Text>
+
+          {/* Fare + payment method */}
+          <View style={[successStyles.fareBox, { backgroundColor: `${colors.green}12`, borderColor: `${colors.green}30` }]}>
+            <Text style={[successStyles.fare, { color: colors.green }]}>{trip?.fare}</Text>
+            <View style={[successStyles.paymentChip, { backgroundColor: colors.bgCard, borderColor: colors.border }]}>
+              <Text style={[successStyles.paymentText, { color: colors.textSecondary }]}>
+                {formatPaymentLabel(paymentMethod)}
+              </Text>
+            </View>
           </View>
+
+          {/* Receipt note */}
           <Text style={[successStyles.sub, { color: colors.textDisabled }]}>
             {t('receiptRecorded')}
           </Text>
+
+          {/* Manual dismiss button */}
+          <TouchableOpacity
+            onPress={handleDone}
+            activeOpacity={0.85}
+            style={[successStyles.doneBtn, { backgroundColor: colors.yellow }]}
+          >
+            <Text style={successStyles.doneBtnText}>OK — Back to Home</Text>
+          </TouchableOpacity>
+
         </Animated.View>
       </View>
     </Modal>
@@ -74,11 +110,13 @@ export default function ActiveTrip({ trip, onComplete, onPickUp, onNoShow, onCan
   const [showSuccess, setShowSuccess] = useState(false);
   const [paidMethod,  setPaidMethod]  = useState(null);
   const [elapsed,     setElapsed]     = useState(0);
-  const startRef = useRef(Date.now());
+  // Use acceptedAt from trip if available (restored from AsyncStorage)
+  const startRef = useRef(trip?.acceptedAt ? new Date(trip.acceptedAt).getTime() : Date.now());
   const timerRef = useRef(null);
 
-  // Live trip timer — starts when ActiveTrip mounts (trip accepted)
+  // Live trip timer — initialises from acceptedAt so it survives app restarts
   useEffect(() => {
+    setElapsed(Math.floor((Date.now() - startRef.current) / 1000));
     timerRef.current = setInterval(() => {
       setElapsed(Math.floor((Date.now() - startRef.current) / 1000));
     }, 1000);
@@ -313,16 +351,19 @@ export default function ActiveTrip({ trip, onComplete, onPickUp, onNoShow, onCan
 }
 
 const successStyles = StyleSheet.create({
-  overlay:   { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
-  card:      { width: '100%', borderRadius: RADIUS.xxxl, padding: 32, alignItems: 'center', gap: 10 },
-  iconWrap:  { width: 90, height: 90, borderRadius: 45, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
-  icon:      { fontSize: 48, color: '#5DCAA5' },
-  title:     { fontSize: 28, fontFamily: FONTS.black, textAlign: 'center' },
-  customer:  { fontSize: 15, fontFamily: FONTS.semiBold, textAlign: 'center' },
-  fareRow:   { flexDirection: 'row', alignItems: 'center', gap: 14, borderWidth: 1, borderRadius: RADIUS.lg, paddingVertical: 12, paddingHorizontal: 20, marginTop: 8 },
-  fare:      { fontSize: 28, fontFamily: FONTS.black },
-  payment:   { fontSize: 14, fontFamily: FONTS.semiBold },
-  sub:       { fontSize: 11, fontFamily: FONTS.semiBold, textAlign: 'center', marginTop: 4 },
+  overlay:      { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28 },
+  card:         { width: '100%', borderRadius: RADIUS.xxxl, padding: 32, alignItems: 'center', gap: 12 },
+  iconWrap:     { width: 100, height: 100, borderRadius: 50, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  icon:         { fontSize: 52, color: '#5DCAA5' },
+  title:        { fontSize: 30, fontFamily: FONTS.black, textAlign: 'center' },
+  customer:     { fontSize: 15, fontFamily: FONTS.semiBold, textAlign: 'center', opacity: 0.8 },
+  fareBox:      { width: '100%', borderWidth: 1, borderRadius: RADIUS.xl, paddingVertical: 18, paddingHorizontal: 20, alignItems: 'center', gap: 8, marginTop: 4 },
+  fare:         { fontSize: 44, fontFamily: FONTS.black },
+  paymentChip:  { borderWidth: 1, borderRadius: RADIUS.full, paddingVertical: 5, paddingHorizontal: 14 },
+  paymentText:  { fontSize: 13, fontFamily: FONTS.bold },
+  sub:          { fontSize: 12, fontFamily: FONTS.semiBold, textAlign: 'center', opacity: 0.5 },
+  doneBtn:      { width: '100%', borderRadius: RADIUS.xl, paddingVertical: 18, alignItems: 'center', marginTop: 8 },
+  doneBtnText:  { fontSize: 16, fontFamily: FONTS.black, color: '#000' },
 });
 
 const styles = StyleSheet.create({
