@@ -10,7 +10,8 @@ import { useTheme } from '../context/ThemeContext';
 import { FONTS, RADIUS } from '../theme';
 
 const { width: SCREEN_W } = Dimensions.get('window');
-const CARD_W = SCREEN_W - 48; // 24px margin each side
+const CARD_W    = SCREEN_W - 48; // card content width
+const PAGE_W    = SCREEN_W;      // each page = full screen width for reliable Android paging
 
 // ─── Single trip card (full details) ─────────────────────────────────────────
 function TripCard({ trip, onAccept, colors, isDark }) {
@@ -112,7 +113,7 @@ export default function AvailableTripsSheet({ trips, onAccept, onClose }) {
   }
 
   function goTo(index) {
-    flatRef.current?.scrollToIndex({ index, animated: true });
+    flatRef.current?.scrollToOffset({ offset: PAGE_W * index, animated: true });
     setCurrentIndex(index);
   }
 
@@ -157,7 +158,7 @@ export default function AvailableTripsSheet({ trips, onAccept, onClose }) {
             </View>
           )}
 
-          {/* Swipeable cards */}
+          {/* Swipeable cards — each item is PAGE_W wide so pagingEnabled works on Android */}
           <FlatList
             ref={flatRef}
             data={trips}
@@ -165,15 +166,14 @@ export default function AvailableTripsSheet({ trips, onAccept, onClose }) {
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
-            snapToInterval={CARD_W + 16}
             decelerationRate="fast"
-            contentContainerStyle={styles.carouselContent}
+            getItemLayout={(_, index) => ({ length: PAGE_W, offset: PAGE_W * index, index })}
             onMomentumScrollEnd={e => {
-              const idx = Math.round(e.nativeEvent.contentOffset.x / (CARD_W + 16));
-              setCurrentIndex(idx);
+              const idx = Math.round(e.nativeEvent.contentOffset.x / PAGE_W);
+              setCurrentIndex(Math.min(Math.max(idx, 0), trips.length - 1));
             }}
             renderItem={({ item }) => (
-              <View style={{ width: CARD_W, marginRight: 16 }}>
+              <View style={{ width: PAGE_W, paddingHorizontal: 24 }}>
                 <TripCard
                   trip={item}
                   onAccept={onAccept}
@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
   dots:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingBottom: 12 },
   dot:   { height: 7, borderRadius: 4 },
 
-  carouselContent: { paddingHorizontal: 20, paddingBottom: 20 },
+  carouselContent: { paddingBottom: 20 },
 
   // Card
   card:       { borderWidth: 1, borderRadius: RADIUS.xxl, overflow: 'hidden', gap: 10, padding: 16 },

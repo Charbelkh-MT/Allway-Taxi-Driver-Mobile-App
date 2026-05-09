@@ -13,7 +13,8 @@ import { formatTime } from '../utils/dateUtils';
 // In Expo Go, background location tasks crash — use foreground-only tracking
 const IS_EXPO_GO = Constants.appOwnership === 'expo';
 
-const SHIFT_STORAGE_KEY = 'allway_active_shift';
+const SHIFT_STORAGE_KEY       = 'allway_active_shift';
+const ACTIVE_TRIP_STORAGE_KEY = 'allway_active_trip';
 
 export const DRIVER_STATE = {
   OFFLINE:  'offline',
@@ -228,35 +229,76 @@ export function DriverProvider({ children }) {
     return () => clearInterval(cleanup);
   }, [driverState]);
 
-  // ─── Restore shift on app reopen ──────────────────────────────────────────────
+  // ─── Restore shift + active trip on app reopen ───────────────────────────────
   useEffect(() => {
     async function restoreShiftIfActive() {
       try {
-        // Check if background GPS task is still running from a previous session
-        const isTracking = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME).catch(() => false);
-        if (!isTracking) return;
-
+        // ── Step 1: Check for saved shift (requires GPS task to be running) ────────
         const saved = await AsyncStorage.getItem(SHIFT_STORAGE_KEY);
         if (!saved) return;
 
         const { userId, shiftId, startTime } = JSON.parse(saved);
         if (!userId) return;
 
-        // Restore refs — set startTimeRef before setDriverState so timer picks it up
+        // Verify GPS is still active (confirms driver is still on shift)
+        const isTracking = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME).catch(() => false);
+
+        // Restore refs
         userIdRef.current       = userId;
         currentShiftRef.current = shiftId ?? null;
         isDemoRef.current       = false;
         startTimeRef.current    = startTime;
 
+        // ── Step 2: Restore active trip (independent of GPS check) ───────────────
+        const savedTrip = await AsyncStorage.getItem(ACTIVE_TRIP_STORAGE_KEY);
+        if (savedTrip) {
+          const trip = JSON.parse(savedTrip);
+
+          // Verify trip is still active in DB
+          const { data: tripRow } = await supabase
+            .from(TABLE_TRIPS)
+            .select('*')
+            .eq(TRIP_COLS.id, trip.id)
+            .single();
+
+          const tripStatus = tripRow?.[TRIP_COLS.status];
+          const stillActive = tripStatus === 'accepted' || tripStatus === 'picked_up';
+
+          if (stillActive) {
+            const restoredTrip = { ...trip, status: tripStatus };
+            activeTripIdRef.current = trip.id;
+            setActiveTrip(restoredTrip);
+            setDriverState(DRIVER_STATE.ACTIVE);
+            subscribeToTrips(userId);
+            await supabase.from(TABLE_DRIVERS)
+              .update({ online: true, [DRIVER_COLS.status]: 'on_trip' })
+              .eq(DRIVER_COLS.id, userId);
+            // Restart GPS if it stopped
+            if (!isTracking) {
+              try { await startForegroundTracking(userId); } catch {}
+            }
+            console.log('[DriverContext] Active trip restored:', trip.id, '— status:', tripStatus);
+            return;
+          } else {
+            // Trip ended while app was closed
+            await AsyncStorage.removeItem(ACTIVE_TRIP_STORAGE_KEY);
+          }
+        }
+
+        // ── Step 3: No active trip — restore to scanning state ────────────────────
+        if (!isTracking) {
+          // GPS stopped — clear shift as driver likely ended it externally
+          await AsyncStorage.removeItem(SHIFT_STORAGE_KEY);
+          return;
+        }
+
         setDriverState(DRIVER_STATE.SCANNING);
         subscribeToTrips(userId);
 
-        // Re-mark online in CRM in case it was cleared
         await supabase.from(TABLE_DRIVERS)
           .update({ online: true, [DRIVER_COLS.status]: 'available' })
           .eq(DRIVER_COLS.id, userId);
 
-        // Fetch any pending trips
         const { data } = await supabase
           .from(TABLE_TRIPS)
           .select('*')
@@ -264,7 +306,7 @@ export function DriverProvider({ children }) {
           .is(TRIP_COLS.driverId, null);
         setAvailableTrips(markPreferred((data ?? []).map(normalizeTrip), userId));
 
-        console.log('[DriverContext] Shift restored from background — elapsed:', Math.floor((Date.now() - startTime) / 1000), 's');
+        console.log('[DriverContext] Shift restored — elapsed:', Math.floor((Date.now() - startTime) / 1000), 's');
       } catch (e) {
         console.warn('[DriverContext] Shift restore error:', e.message);
       }
@@ -541,6 +583,11 @@ export function DriverProvider({ children }) {
     setPendingTrip(null);
     setAvailableTrips(prev => prev.filter(t => t.id !== resolved.id));
 
+    // Persist active trip so it survives app being fully closed
+    try {
+      await AsyncStorage.setItem(ACTIVE_TRIP_STORAGE_KEY, JSON.stringify(resolved));
+    } catch (e) { console.warn('[DriverContext] Save active trip error:', e.message); }
+
     // Update CRM status to on_trip
     const uid = userIdRef.current;
     if (!isDemoRef.current && uid) {
@@ -553,8 +600,11 @@ export function DriverProvider({ children }) {
   // ─── Passenger picked up (en route to drop-off) ──────────────────────────────
   async function pickUpPassenger() {
     const tripId = activeTripIdRef.current;
-    // Update local state immediately for snappy UI
-    setActiveTrip(prev => prev ? { ...prev, status: 'picked_up' } : prev);
+    setActiveTrip(prev => {
+      const updated = prev ? { ...prev, status: 'picked_up' } : prev;
+      if (updated) AsyncStorage.setItem(ACTIVE_TRIP_STORAGE_KEY, JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
     if (!isDemoRef.current && tripId) {
       try {
         await supabase.from(TABLE_TRIPS).update({ [TRIP_COLS.status]: 'picked_up' }).eq(TRIP_COLS.id, tripId);
@@ -568,6 +618,7 @@ export function DriverProvider({ children }) {
     activeTripIdRef.current = null;
     setActiveTrip(null);
     setDriverState(DRIVER_STATE.SCANNING);
+    try { await AsyncStorage.removeItem(ACTIVE_TRIP_STORAGE_KEY); } catch {}
     if (!isDemoRef.current && tripId) {
       // Trip update has no user dependency — do it first so it always succeeds
       try {
@@ -589,6 +640,7 @@ export function DriverProvider({ children }) {
     activeTripIdRef.current = null;
     setActiveTrip(null);
     setDriverState(DRIVER_STATE.SCANNING);
+    try { await AsyncStorage.removeItem(ACTIVE_TRIP_STORAGE_KEY); } catch {}
     if (!isDemoRef.current && tripId) {
       try {
         await supabase.from(TABLE_TRIPS)
@@ -610,6 +662,7 @@ export function DriverProvider({ children }) {
     activeTripIdRef.current = null;
     setActiveTrip(null);
     setDriverState(DRIVER_STATE.SCANNING);
+    try { await AsyncStorage.removeItem(ACTIVE_TRIP_STORAGE_KEY); } catch {}
 
     if (isDemoRef.current) {
       clearTimeout(scanTimeoutRef.current);

@@ -185,7 +185,7 @@ export default function HomeScreen() {
       {showAvailableSheet && (
         <AvailableTripsSheet
           trips={availableTrips}
-          onAccept={(trip) => { setShowAvailableSheet(false); openTripSheet(trip, false); }}
+          onAccept={(trip) => { setShowAvailableSheet(false); acceptTrip(trip); }}
           onClose={() => setShowAvailableSheet(false)}
         />
       )}
@@ -196,16 +196,15 @@ export default function HomeScreen() {
           <TouchableOpacity
             style={[styles.floatBtn, { backgroundColor: colors.yellow }]}
             onPress={() => {
-              // Filter out expired trips before acting
               const validTrips = availableTrips.filter(t => {
                 if (!t.createdAt) return true;
                 return (Date.now() - new Date(t.createdAt).getTime()) / 1000 < 84;
               });
-              if (validTrips.length === 0) return; // all expired, cleanup will remove them
+              if (validTrips.length === 0) return;
               if (validTrips.length === 1) {
-                openTripSheet(validTrips[0]);
+                openTripSheet(validTrips[0]); // single trip → show countdown popup so driver can review before accepting
               } else {
-                setShowAvailableSheet(true);
+                setShowAvailableSheet(true); // multiple trips → show list to browse and accept
               }
             }}
             activeOpacity={0.85}
