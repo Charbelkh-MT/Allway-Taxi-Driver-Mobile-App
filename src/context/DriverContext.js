@@ -104,9 +104,12 @@ function markPreferred(trips, userId) {
   return trips.map(t => ({ ...t, isPreferred: t.preferredDriverId === userId }));
 }
 
-// Foreground GPS watcher — used as the primary stream and as the Expo Go fallback.
-// watchPositionAsync delivers on a reliable 2s cadence; getCurrentPositionAsync + setInterval
-// previously stretched effective send rates to 3-4s.
+const DISPATCH_RADIUS_KM = 15; // drivers only receive trips within this radius
+
+// Module-level GPS state — accessible by both the watcher and the trip filter
+let driverLat  = null;
+let driverLng  = null;
+let gpsTick    = 0;     // increments every 2s ping
 let locationSubscription = null;
 
 async function startForegroundTracking(cachedUserId) {
@@ -129,17 +132,29 @@ async function startForegroundTracking(cachedUserId) {
         const speed   = Math.max(0, location.coords.speed ?? 0);
         const now     = new Date().toISOString();
 
+        // Keep module-level position in sync for proximity filtering
+        driverLat = lat;
+        driverLng = lng;
+        gpsTick++;
+
         console.log(`[GPS] lat=${lat.toFixed(6)}  lng=${lng.toFixed(6)}  heading=${heading.toFixed(1)}°  speed=${speed.toFixed(1)}m/s`);
 
-        await Promise.all([
+        // driver_locations gets every ping (CRM map needs real-time position)
+        // drivers table is updated every 30s to reduce unnecessary DB writes
+        const ops = [
           supabase.from(TABLE_LOCATIONS).upsert(
             { driver_id: cachedUserId, lat, lng, heading, speed, is_online: true, updated_at: now },
             { onConflict: 'driver_id' }
           ),
-          supabase.from(TABLE_DRIVERS)
-            .update({ lat, lng, last_seen: now, heading, speed })
-            .eq(DRIVER_COLS.id, cachedUserId),
-        ]);
+        ];
+        if (gpsTick % 15 === 0) {
+          ops.push(
+            supabase.from(TABLE_DRIVERS)
+              .update({ lat, lng, last_seen: now, heading, speed })
+              .eq(DRIVER_COLS.id, cachedUserId)
+          );
+        }
+        await Promise.all(ops);
       } catch (e) { console.warn('[GPS] Write error:', e.message); }
     }
   );
@@ -151,6 +166,9 @@ async function stopForegroundTracking() {
   if (locationSubscription) {
     locationSubscription.remove();
     locationSubscription = null;
+    driverLat = null;
+    driverLng = null;
+    gpsTick   = 0;
     console.log('[GPS] Foreground watch stopped');
   }
   try {
@@ -373,49 +391,54 @@ export function DriverProvider({ children }) {
 
     channelRef.current = supabase
       .channel(`dispatch-${userId}`)
+      // INSERT — server-side filtered by ride_type to reduce unnecessary traffic
       .on(
         'postgres_changes',
         {
-          event:  '*',
+          event:  'INSERT',
           schema: 'public',
           table:  TABLE_TRIPS,
+          filter: `${TRIP_COLS.rideType}=eq.${carTypeRef.current}`,
         },
-        async (payload) => {
-          // DELETE: payload.old is unreliable; re-sync from DB
-          if (payload.eventType === 'DELETE') {
-            await syncPendingTrips();
-            return;
-          }
-
-          const row = payload.new;
+        (payload) => {
+          const row      = payload.new;
           if (!row) return;
-
           const status   = row[TRIP_COLS.status];
           const driverId = row[TRIP_COLS.driverId];
-
-          // UPDATE: status changed — re-sync to get the accurate list
-          if (payload.eventType === 'UPDATE') {
-            if (status !== 'pending') {
-              await syncPendingTrips();
-            }
-            return;
-          }
-
-          // INSERT: only react to new unclaimed pending trips matching the driver's car type
           if (status !== 'pending' || driverId) return;
-          if (row[TRIP_COLS.rideType] && row[TRIP_COLS.rideType] !== carTypeRef.current) return;
 
           const trip = normalizeTrip(row);
 
-          // TODO: re-enable range filter before production
+          // Proximity filter — skip if pickup coords available but outside radius
+          if (
+            trip.pickupLat && trip.pickupLng &&
+            driverLat !== null && driverLng !== null
+          ) {
+            const distKm = haversineKm(driverLat, driverLng, trip.pickupLat, trip.pickupLng);
+            if (distKm > DISPATCH_RADIUS_KM) return;
+          }
 
           const markedTrip = markPreferred([trip], userIdRef.current)[0];
           setAvailableTrips(prev =>
             prev.find(t => t.id === markedTrip.id) ? prev : [markedTrip, ...prev]
           );
-          // Realtime path → play the in-app sound (push notification handles the external alert)
           openTripSheet(trip, true);
         }
+      )
+      // UPDATE — re-sync list when a trip status changes
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: TABLE_TRIPS },
+        async (payload) => {
+          const status = payload.new?.[TRIP_COLS.status];
+          if (status && status !== 'pending') await syncPendingTrips();
+        }
+      )
+      // DELETE — payload.old is unreliable; always re-sync
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: TABLE_TRIPS },
+        async () => { await syncPendingTrips(); }
       )
       .subscribe((status) => console.log('[Realtime] dispatch channel:', status));
   }

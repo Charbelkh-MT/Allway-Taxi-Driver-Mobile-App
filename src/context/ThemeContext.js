@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as NavigationBar from 'expo-navigation-bar';
+
+let NavigationBar = null;
+try { NavigationBar = require('expo-navigation-bar'); } catch {}
 
 const ACCENTS = {
   yellow:      '#F5B800',
@@ -52,9 +54,11 @@ const LIGHT = {
 const STORAGE_KEY = 'allway_theme';
 
 function applyNavBar(dark) {
-  if (Platform.OS !== 'android') return;
-  NavigationBar.setBackgroundColorAsync(dark ? '#000000' : '#FFFFFF');
-  NavigationBar.setButtonStyleAsync(dark ? 'light' : 'dark');
+  if (Platform.OS !== 'android' || !NavigationBar) return;
+  try {
+    NavigationBar.setBackgroundColorAsync(dark ? '#000000' : '#FFFFFF');
+    NavigationBar.setButtonStyleAsync(dark ? 'light' : 'dark');
+  } catch {}
 }
 
 const ThemeContext = createContext({ colors: LIGHT, isDark: false, toggleTheme: () => {} });
