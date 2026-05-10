@@ -37,4 +37,6 @@ yarn-error.*
 
 # Test output
 coverage/
+
+# Sensitive — never commit
 google-services.json
