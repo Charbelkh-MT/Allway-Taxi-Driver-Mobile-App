@@ -45,3 +45,29 @@ export function getWeekBounds() {
 export function sumFare(rows, fareCol) {
   return rows.reduce((s, r) => s + (Number(r[fareCol]) || 0), 0);
 }
+
+// "in 2h 15min" / "in 45min" / "Starting now"
+export function timeUntil(iso) {
+  if (!iso) return '';
+  const diffMs = new Date(iso).getTime() - Date.now();
+  if (diffMs <= 0) return 'Starting now';
+  const totalMin = Math.ceil(diffMs / 60000);
+  if (totalMin < 60) return `in ${totalMin}min`;
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return m > 0 ? `in ${h}h ${m}min` : `in ${h}h`;
+}
+
+// "Today · 2:30 PM" / "Tomorrow · 2:30 PM" / "Mon 12 · 2:30 PM"
+export function formatScheduledTime(iso) {
+  if (!iso) return '';
+  const d     = new Date(iso);
+  const now   = new Date();
+  const time  = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+  const isToday    = d.toDateString() === now.toDateString();
+  const isTomorrow = d.toDateString() === new Date(now.getTime() + 86400000).toDateString();
+  if (isToday)    return `Today · ${time}`;
+  if (isTomorrow) return `Tomorrow · ${time}`;
+  const day = d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
+  return `${day} · ${time}`;
+}

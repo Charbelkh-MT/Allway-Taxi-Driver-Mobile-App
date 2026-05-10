@@ -202,7 +202,10 @@ export const TRIP_COLS = {
   dropoffLat:         'dropoff_lat',
   dropoffLng:         'dropoff_lng',
   createdAt:          'requested_at',
-  // Trip status values: 'pending' | 'accepted' | 'picked_up' | 'completed' | 'no_show' | 'cancelled'
+  scheduledFor:       'scheduled_for',
+  groupSize:          'group_size',
+  notes:              'notes',
+  // Trip status values: 'pending' | 'scheduled' | 'dispatching' | 'accepted' | 'picked_up' | 'completed' | 'no_show' | 'cancelled'
   // ride_type values: 'comfort' | 'xl'
 };
 

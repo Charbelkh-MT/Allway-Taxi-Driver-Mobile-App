@@ -96,6 +96,9 @@ function normalizeTrip(row) {
     passengerCount:     Number(row[TRIP_COLS.passengerCount]) || 1,
     dispatchTimeoutAt:  row[TRIP_COLS.dispatchTimeoutAt]  ?? null,
     createdAt:          row[TRIP_COLS.createdAt]           ?? null,
+    scheduledFor:       row[TRIP_COLS.scheduledFor]        ?? null,
+    groupSize:          row[TRIP_COLS.groupSize]           ?? null,
+    notes:              row[TRIP_COLS.notes]               ?? null,
   };
 }
 
@@ -198,6 +201,7 @@ export function DriverProvider({ children }) {
   const [shiftSeconds, setShiftSeconds]     = useState(0);
   const [availableTrips, setAvailableTrips] = useState([]);
   const [cashCollected, setCashCollected]   = useState(0);
+  const [scheduledTrips, setScheduledTrips] = useState([]);
 
   const timerRef        = useRef(null);
   const startTimeRef    = useRef(null);
@@ -425,12 +429,32 @@ export function DriverProvider({ children }) {
           openTripSheet(trip, true);
         }
       )
-      // UPDATE — re-sync list when a trip status changes
+      // UPDATE — handle scheduled trips becoming live, and re-sync the pending queue
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: TABLE_TRIPS },
         async (payload) => {
-          const status = payload.new?.[TRIP_COLS.status];
+          const row      = payload.new;
+          const status   = row?.[TRIP_COLS.status];
+          const driverId = row?.[TRIP_COLS.driverId];
+
+          // Driver's own scheduled trip is now being dispatched — show acceptance sheet
+          if (
+            (status === 'pending' || status === 'dispatching') &&
+            driverId === userIdRef.current
+          ) {
+            setScheduledTrips(prev => prev.filter(t => t.id !== row?.id));
+            const trip = normalizeTrip(row);
+            openTripSheet(markPreferred([trip], userIdRef.current)[0], true);
+            return;
+          }
+
+          // Remove from upcoming list if trip was cancelled or modified
+          if (driverId === userIdRef.current && status !== 'scheduled') {
+            setScheduledTrips(prev => prev.filter(t => t.id !== row?.id));
+          }
+
+          // Re-sync available queue when any trip leaves pending state
           if (status && status !== 'pending') await syncPendingTrips();
         }
       )
@@ -460,6 +484,29 @@ export function DriverProvider({ children }) {
       setCashCollected(next);
       AsyncStorage.setItem(CASH_STORAGE_KEY, String(next)).catch(() => {});
     }
+  }
+
+  async function fetchScheduledTrips() {
+    if (isDemoRef.current) return;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from(TABLE_TRIPS)
+        .select([
+          TRIP_COLS.id, TRIP_COLS.customerName, TRIP_COLS.customerPhone,
+          TRIP_COLS.pickupAddress, TRIP_COLS.dropoffAddress,
+          TRIP_COLS.pickupLat, TRIP_COLS.pickupLng, TRIP_COLS.dropoffLat, TRIP_COLS.dropoffLng,
+          TRIP_COLS.fare, TRIP_COLS.distanceKm, TRIP_COLS.rideType,
+          TRIP_COLS.passengerCount, TRIP_COLS.allowDebt, TRIP_COLS.preferredDriverId,
+          TRIP_COLS.scheduledFor, TRIP_COLS.groupSize, TRIP_COLS.notes,
+          TRIP_COLS.dispatchTimeoutAt, TRIP_COLS.createdAt,
+        ].join(', '))
+        .eq(TRIP_COLS.driverId, user.id)
+        .eq(TRIP_COLS.status, 'scheduled')
+        .order(TRIP_COLS.scheduledFor, { ascending: true });
+      setScheduledTrips((data ?? []).map(normalizeTrip));
+    } catch (e) { console.warn('[DriverContext] fetchScheduledTrips error:', e.message); }
   }
 
   async function buildShiftSummary() {
@@ -574,6 +621,7 @@ export function DriverProvider({ children }) {
 
     isDemoRef.current = false;
     subscribeToTrips(user.id);
+    fetchScheduledTrips();
 
     try {
       await supabase.from(TABLE_DRIVERS)
@@ -625,6 +673,7 @@ export function DriverProvider({ children }) {
 
     cashRef.current = 0;
     setCashCollected(0);
+    setScheduledTrips([]);
 
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
@@ -861,6 +910,7 @@ export function DriverProvider({ children }) {
         shiftTime: formatTime(shiftSeconds),
         isOnline:  driverState !== DRIVER_STATE.OFFLINE,
         cashCollected,
+        scheduledTrips,
         buildShiftSummary,
         goOnline,
         goOffline,

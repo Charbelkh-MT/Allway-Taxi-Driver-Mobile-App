@@ -207,6 +207,12 @@ export const translations = {
     driverPortal:        '🚖  DRIVER PORTAL',
     loginError:          'Enter your phone number and a 4-digit PIN.',
 
+    // ── Scheduled trips & large groups ───────────────────────
+    upcomingTrips:    'Upcoming Trips',
+    largeGroup:       'Large group',
+    people:           'people',
+    dispatcherNotes:  'Dispatcher Notes',
+
     // ── Shift summary ────────────────────────────────────────
     shiftSummaryTitle:   "Today's Shift",
     shiftSummaryLoading: 'Calculating your shift…',
@@ -446,6 +452,12 @@ export const translations = {
     gettingDashboard:    'جارٍ تجهيز لوحة التحكم…',
     driverPortal:        '🚖  بوابة السائق',
     loginError:          'أدخل رقم هاتفك والرقم السري.',
+
+    // ── Scheduled trips & large groups ───────────────────────
+    upcomingTrips:    'الرحلات القادمة',
+    largeGroup:       'مجموعة كبيرة',
+    people:           'أشخاص',
+    dispatcherNotes:  'ملاحظات المرسل',
 
     // ── Shift summary ────────────────────────────────────────
     shiftSummaryTitle:   'ملخص المناوبة',

@@ -8,9 +8,10 @@ import * as Haptics from 'expo-haptics';
 import { useTheme } from '../context/ThemeContext';
 import { FONTS, RADIUS } from '../theme';
 
-const { width: SCREEN_W } = Dimensions.get('window');
-// Each page = full screen width so Android paging stays in sync with the snap target
-const PAGE_W = SCREEN_W;
+const { width: SCREEN_W }  = Dimensions.get('window');
+const PAGE_W               = SCREEN_W;
+const LARGE_GROUP_THRESHOLD = 6;
+const ORANGE               = '#F5A623';
 
 function TripCard({ trip, onAccept, colors, isDark }) {
   return (
@@ -62,6 +63,19 @@ function TripCard({ trip, onAccept, colors, isDark }) {
         </View>
         <Text style={[styles.custLabel, { color: colors.textDisabled }]}>RIDER</Text>
       </View>
+
+      {(trip.groupSize ?? 0) > LARGE_GROUP_THRESHOLD && (
+        <View style={[styles.largeBadge, { backgroundColor: `${ORANGE}15`, borderColor: `${ORANGE}40` }]}>
+          <Text style={[styles.largeBadgeText, { color: ORANGE }]}>👥  Large group — {trip.groupSize} people</Text>
+        </View>
+      )}
+
+      {!!trip.notes && (
+        <View style={[styles.notesBlock, { backgroundColor: `${ORANGE}10`, borderColor: `${ORANGE}35` }]}>
+          <Text style={[styles.notesLabel, { color: ORANGE }]}>📋  Dispatcher Notes</Text>
+          <Text style={[styles.notesText, { color: colors.textSecondary }]}>{trip.notes}</Text>
+        </View>
+      )}
 
       <TouchableOpacity
         onPress={async () => {
@@ -223,7 +237,12 @@ const styles = StyleSheet.create({
   custPhone:    { fontSize: 12, fontFamily: FONTS.semiBold, marginTop: 2 },
   custLabel:    { fontSize: 10, fontFamily: FONTS.extraBold, letterSpacing: 0.5 },
 
-  acceptWrap: { borderRadius: RADIUS.xl, overflow: 'hidden' },
-  acceptBtn:  { paddingVertical: 17, alignItems: 'center' },
-  acceptText: { fontSize: 15, fontFamily: FONTS.black, color: '#000' },
+  acceptWrap:     { borderRadius: RADIUS.xl, overflow: 'hidden' },
+  acceptBtn:      { paddingVertical: 17, alignItems: 'center' },
+  acceptText:     { fontSize: 15, fontFamily: FONTS.black, color: '#000' },
+  largeBadge:     { borderWidth: 1, borderRadius: RADIUS.lg, paddingVertical: 8, paddingHorizontal: 14 },
+  largeBadgeText: { fontSize: 13, fontFamily: FONTS.extraBold },
+  notesBlock:     { borderWidth: 1, borderRadius: RADIUS.lg, padding: 12, gap: 4 },
+  notesLabel:     { fontSize: 10, fontFamily: FONTS.extraBold, letterSpacing: 0.5 },
+  notesText:      { fontSize: 13, fontFamily: FONTS.semiBold, lineHeight: 19 },
 });

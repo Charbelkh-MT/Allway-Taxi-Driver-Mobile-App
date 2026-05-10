@@ -17,6 +17,7 @@ import ActiveTrip from '../components/ActiveTrip';
 import AvailableTripsSheet from '../components/AvailableTripsSheet';
 import ShiftSummaryModal from '../components/ShiftSummaryModal';
 import SosButton from '../components/SosButton';
+import UpcomingTrips from '../components/UpcomingTrips';
 import { registerForPushNotificationsAsync } from '../utils/notifications';
 import { SkeletonChart } from '../components/Skeleton';
 import { supabase } from '../utils/supabase';
@@ -29,7 +30,7 @@ export default function HomeScreen() {
   const {
     driverState, activeTrip, showTripSheet,
     availableTrips, shiftTime, shiftSeconds, isOnline,
-    cashCollected, buildShiftSummary,
+    cashCollected, scheduledTrips, buildShiftSummary,
     goOnline, goOffline, acceptTrip, completeTrip,
     pickUpPassenger, markNoShow, cancelTrip, openTripSheet,
   } = useDriver();
@@ -184,8 +185,14 @@ export default function HomeScreen() {
           </FadeInView>
         )}
 
+        {isOnline && scheduledTrips.length > 0 && (
+          <FadeInView delay={140} distance={16}>
+            <UpcomingTrips trips={scheduledTrips} />
+          </FadeInView>
+        )}
+
         {isOnline && (
-          <FadeInView delay={140} distance={10}>
+          <FadeInView delay={160} distance={10}>
             <SosButton />
           </FadeInView>
         )}

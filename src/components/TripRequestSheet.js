@@ -10,7 +10,9 @@ import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 import { FONTS, RADIUS } from '../theme';
 
-const COUNTDOWN_MAX = 84;
+const COUNTDOWN_MAX        = 84;
+const LARGE_GROUP_THRESHOLD = 6;
+const ORANGE               = '#F5A623';
 
 function getInitialCountdown(trip) {
   // dispatch_timeout_at from CRM is authoritative; fall back to local calculation
@@ -154,9 +156,14 @@ export default function TripRequestSheet({ trip, onAccept, onDecline, withSound 
               </View>
             </View>
 
-            {(trip.passengerCount > 1 || trip.allowDebt) && (
+            {(trip.passengerCount > 1 || trip.allowDebt || (trip.groupSize ?? 0) > LARGE_GROUP_THRESHOLD) && (
               <View style={styles.badgeRow}>
-                {trip.passengerCount > 1 && (
+                {(trip.groupSize ?? 0) > LARGE_GROUP_THRESHOLD && (
+                  <View style={[styles.infoBadge, { backgroundColor: `${ORANGE}15`, borderColor: `${ORANGE}40` }]}>
+                    <Text style={[styles.infoBadgeText, { color: ORANGE }]}>👥  Large group — {trip.groupSize} people</Text>
+                  </View>
+                )}
+                {trip.passengerCount > 1 && (trip.groupSize ?? 0) <= LARGE_GROUP_THRESHOLD && (
                   <View style={[styles.infoBadge, { backgroundColor: `${colors.yellow}15`, borderColor: `${colors.yellow}40` }]}>
                     <Text style={[styles.infoBadgeText, { color: colors.yellow }]}>👥  {trip.passengerCount} passengers</Text>
                   </View>
@@ -166,6 +173,13 @@ export default function TripRequestSheet({ trip, onAccept, onDecline, withSound 
                     <Text style={[styles.infoBadgeText, { color: colors.red }]}>📋  Credit Account</Text>
                   </View>
                 )}
+              </View>
+            )}
+
+            {!!trip.notes && (
+              <View style={[styles.notesBlock, { backgroundColor: `${ORANGE}10`, borderColor: `${ORANGE}35` }]}>
+                <Text style={[styles.notesLabel, { color: ORANGE }]}>📋  Dispatcher Notes</Text>
+                <Text style={[styles.notesText, { color: colors.textSecondary }]}>{trip.notes}</Text>
               </View>
             )}
 
@@ -235,6 +249,9 @@ const styles = StyleSheet.create({
   badgeRow:      { flexDirection: 'row', gap: 8, marginHorizontal: 14, marginBottom: 12, flexWrap: 'wrap' },
   infoBadge:     { borderWidth: 1, borderRadius: 20, paddingVertical: 5, paddingHorizontal: 12 },
   infoBadgeText: { fontSize: 11, fontFamily: FONTS.extraBold },
+  notesBlock:    { marginHorizontal: 14, marginBottom: 12, borderWidth: 1, borderRadius: RADIUS.lg, padding: 12, gap: 4 },
+  notesLabel:    { fontSize: 10, fontFamily: FONTS.extraBold, letterSpacing: 0.5 },
+  notesText:     { fontSize: 13, fontFamily: FONTS.semiBold, lineHeight: 19 },
 
   buttons:      { flexDirection: 'row', gap: 10, marginHorizontal: 14, marginBottom: 20 },
   declineBtn:   { paddingVertical: 18, paddingHorizontal: 20, borderWidth: 1, borderRadius: RADIUS.lg, alignItems: 'center' },
