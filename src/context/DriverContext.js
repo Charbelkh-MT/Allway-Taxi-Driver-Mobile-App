@@ -119,9 +119,9 @@ async function startForegroundTracking(cachedUserId) {
 
   locationSubscription = await Location.watchPositionAsync(
     {
-      accuracy:         Location.Accuracy.High,
-      timeInterval:     2000, // minimum ms between updates
-      distanceInterval: 0,    // fire even when stationary so dashboard stays live
+      accuracy:         Location.Accuracy.Balanced, // Balanced fires more reliably when stationary vs High
+      timeInterval:     2000,
+      distanceInterval: 0,
     },
     async (location) => {
       if (!locationSubscription) return;
@@ -459,20 +459,20 @@ export function DriverProvider({ children }) {
     userIdRef.current = user.id;
     carTypeRef.current = driver?.carType ?? 'comfort';
 
-    // Expo Go: skip background task entirely — it crashes Expo Go
-    // EAS native build: attempt background task, fall back to foreground if unavailable
+    // Always start foreground watcher — ensures reliable 2s logs and Supabase writes
+    // In dev builds the background task process doesn't stream logs to Metro consistently
+    // In production the background task handles screen-off tracking on top of this
     try {
-      if (IS_EXPO_GO) {
-        await startForegroundTracking(user.id);
-      } else {
-        const backgroundStarted = await startLocationTracking();
-        if (backgroundStarted !== true) await startForegroundTracking(user.id);
-      }
+      await startForegroundTracking(user.id);
     } catch (e) {
-      console.warn('[DriverContext] GPS start error:', e.message);
-      try { await startForegroundTracking(user.id); } catch (e2) {
-        console.warn('[DriverContext] Foreground fallback failed:', e2.message);
-      }
+      console.warn('[DriverContext] Foreground GPS failed:', e.message);
+    }
+
+    // Additionally start background task on native builds (keeps GPS alive when screen off)
+    if (!IS_EXPO_GO) {
+      startLocationTracking().catch(e =>
+        console.warn('[DriverContext] Background task failed (non-fatal):', e.message)
+      );
     }
 
     // Real mode — subscribe first, then log shift

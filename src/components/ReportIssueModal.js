@@ -56,46 +56,50 @@ function RecordingWaveform({ levels, color }) {
 }
 
 // ─── WhatsApp-style playback waveform ────────────────────────────────────────
-function PlaybackWaveform({ levels, progress, color, dimColor, onSeek }) {
-  const containerRef = useRef(null);
-  const [width, setWidth] = useState(0);
+// Uses Animated.Value so progress updates bypass React reconciler — smooth, no re-renders
+function PlaybackWaveform({ levels, progressAnim, color, dimColor }) {
+  const [containerW, setContainerW] = useState(300);
 
-  const playedCount = Math.round(progress * BAR_COUNT);
+  const overlayWidth = progressAnim.interpolate({
+    inputRange:  [0, 1],
+    outputRange: [0, containerW],
+  });
+  const circleLeft = progressAnim.interpolate({
+    inputRange:  [0, 1],
+    outputRange: [-6, containerW - 6],
+  });
 
   return (
     <View
-      ref={containerRef}
       style={waveStyles.container}
-      onLayout={e => setWidth(e.nativeEvent.layout.width)}
+      onLayout={e => setContainerW(e.nativeEvent.layout.width)}
     >
-      {levels.map((lvl, i) => {
-        const played  = i < playedCount;
-        const isHead  = i === playedCount;
-        return (
-          <View key={i} style={{ alignItems: 'center', justifyContent: 'center' }}>
-            {/* Moving circle playhead */}
-            {isHead && (
-              <View style={[waveStyles.playhead, { backgroundColor: color }]} />
-            )}
-            <View style={[
-              waveStyles.bar,
-              {
-                height:          Math.max(3, lvl * 42),
-                backgroundColor: played ? color : dimColor,
-                opacity:         played ? 1 : 0.35,
-              },
-            ]} />
-          </View>
-        );
-      })}
+      {/* Dimmed base bars — static, never re-render */}
+      {levels.map((lvl, i) => (
+        <View key={i} style={[waveStyles.bar, { height: Math.max(3, lvl * 42), backgroundColor: dimColor, opacity: 0.3 }]} />
+      ))}
+
+      {/* Colored overlay clipped to played portion — native animation */}
+      <Animated.View style={[waveStyles.overlay, { width: overlayWidth }]}>
+        <View style={[waveStyles.innerRow, { width: containerW }]}>
+          {levels.map((lvl, i) => (
+            <View key={i} style={[waveStyles.bar, { height: Math.max(3, lvl * 42), backgroundColor: color }]} />
+          ))}
+        </View>
+      </Animated.View>
+
+      {/* Moving circle playhead */}
+      <Animated.View style={[waveStyles.playhead, { backgroundColor: color, left: circleLeft }]} />
     </View>
   );
 }
 
 const waveStyles = StyleSheet.create({
-  container: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 56, paddingHorizontal: 4 },
+  container: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 56, paddingHorizontal: 0 },
   bar:       { width: 3, borderRadius: 2, minHeight: 3 },
-  playhead:  { width: 12, height: 12, borderRadius: 6, position: 'absolute', zIndex: 10 },
+  overlay:   { position: 'absolute', top: 0, bottom: 0, left: 0, overflow: 'hidden' },
+  innerRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 56 },
+  playhead:  { width: 13, height: 13, borderRadius: 7, position: 'absolute', top: '50%', marginTop: -6 },
 });
 
 // ─── Selector chips ───────────────────────────────────────────────────────────
@@ -141,7 +145,7 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
   const [recordingUri,  setRecordingUri]  = useState(null);
   const [duration,      setDuration]      = useState(0);
   const [isPlaying,     setIsPlaying]     = useState(false);
-  const [playProgress,  setPlayProgress]  = useState(0);
+  const progressAnim = useRef(new Animated.Value(0)).current;
   const [sent,          setSent]          = useState(false);
   const [isSending,     setIsSending]     = useState(false);
   const [levels,        setLevels]        = useState(Array(BAR_COUNT).fill(0));
@@ -227,16 +231,17 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
       );
       soundRef.current = sound;
       setIsPlaying(true);
-      setPlayProgress(0);
+      progressAnim.setValue(0);
 
       sound.setOnPlaybackStatusUpdate(status => {
         if (!status.isLoaded) return;
         if (status.durationMillis) {
-          setPlayProgress(status.positionMillis / status.durationMillis);
+          // Direct setValue bypasses React — no re-renders, silky smooth
+          progressAnim.setValue(status.positionMillis / status.durationMillis);
         }
         if (status.didJustFinish) {
           setIsPlaying(false);
-          setPlayProgress(0);
+          progressAnim.setValue(0);
           sound.unloadAsync();
           soundRef.current = null;
         }
@@ -251,13 +256,13 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
       soundRef.current = null;
     }
     setIsPlaying(false);
-    setPlayProgress(0);
+    progressAnim.setValue(0);
   }
 
   function resetRecording() {
     setRecordingUri(null);
     setDuration(0);
-    setPlayProgress(0);
+    progressAnim.setValue(0);
     setLevels(Array(BAR_COUNT).fill(0));
     setSavedLevels(Array(BAR_COUNT).fill(0));
     levelsRef.current = Array(BAR_COUNT).fill(0);
@@ -377,8 +382,8 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
                 {recordingUri ? (
                   <PlaybackWaveform
                     levels={savedLevels}
-                    progress={playProgress}
-                    color={accentColor}
+                    progressAnim={progressAnim}
+                    color={colors.yellow}
                     dimColor={colors.border}
                   />
                 ) : (
@@ -389,7 +394,7 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
                 )}
 
                 <Text style={[styles.waveLabel, {
-                  color: isRecording ? colors.red : recordingUri ? accentColor : colors.textDisabled,
+                  color: isRecording ? colors.red : recordingUri ? colors.yellow : colors.textDisabled,
                 }]}>
                   {isRecording
                     ? t('recordingLabel')
@@ -422,15 +427,15 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
                     <TouchableOpacity
                       onPress={isPlaying ? stopPlayback : playBack}
                       activeOpacity={0.85}
-                      style={[styles.playCircle, { backgroundColor: accentColor }]}
+                      style={[styles.playCircle, { backgroundColor: colors.yellow }]}
                     >
                       <Text style={styles.playCircleIcon}>{isPlaying ? '⏸' : '▶'}</Text>
                     </TouchableOpacity>
 
                     {/* Re-record button */}
                     <TouchableOpacity onPress={() => { stopPlayback(); resetRecording(); }} activeOpacity={0.75}
-                      style={[styles.reRecordBtn, { borderColor: colors.border }]}>
-                      <Text style={[styles.reRecordText, { color: colors.textMuted }]}>🔄  {t('reRecord')}</Text>
+                      style={[styles.reRecordBtn, { borderColor: colors.yellow, backgroundColor: `${colors.yellow}15` }]}>
+                      <Text style={[styles.reRecordText, { color: colors.yellow }]}>{t('reRecord')}</Text>
                     </TouchableOpacity>
                   </View>
                   <TouchableOpacity onPress={handleSend} activeOpacity={0.85} disabled={isSending}
