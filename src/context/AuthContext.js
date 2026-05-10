@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { supabase } from '../utils/supabase';
 import { TABLE_DRIVERS, DRIVER_COLS } from '../config';
+import { registerForPushNotificationsAsync } from '../utils/notifications';
 
 const AuthContext = createContext(null);
 
@@ -99,6 +100,16 @@ export function AuthProvider({ children }) {
         .single();
       if (error) throw error;
       applyDriverRow(data);
+
+      // Register push token on every app open — token can change, always overwrite
+      registerForPushNotificationsAsync().then(token => {
+        if (token) {
+          supabase.from(TABLE_DRIVERS)
+            .update({ [DRIVER_COLS.pushToken]: token })
+            .eq(DRIVER_COLS.id, authUserId)
+            .then(() => console.log('[Auth] Push token saved'));
+        }
+      }).catch(() => {});
 
       // Real-time: keep driver profile in sync (rating, totalTrips updated by dispatcher)
       unsubscribeProfile();

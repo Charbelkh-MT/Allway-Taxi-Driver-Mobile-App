@@ -266,6 +266,7 @@ export default function AccountScreen() {
             <InfoRow label={t('phone')}       value={driver.phone}   />
             <InfoRow label={t('carModel')}    value={driver.vehicle} />
             <InfoRow label={t('plate')}       value={driver.plate}   />
+            <InfoRow label="Car Type"         value={driver.carType === 'xl' ? '🚐  XL' : '🚕  Comfort'} />
             <InfoRow label={t('totalTrips')}  value={String(driver.totalTrips)} last />
           </View>
 

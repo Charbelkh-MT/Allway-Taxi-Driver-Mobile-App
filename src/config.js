@@ -116,6 +116,12 @@ export const TRIP_COLS = {
   passengerCount:     'passenger_count',
   dispatchTimeoutAt:  'dispatch_timeout_at',
   acceptedAt:         'accepted_at',
+  pickupAt:           'pickup_at',
+  durationMin:        'duration_min',
+  distanceKm:         'distance_km',
+  customerRating:     'customer_rating',
+  dropoffLat:         'dropoff_lat',
+  dropoffLng:         'dropoff_lng',
   createdAt:          'requested_at',
   // Trip status values: 'pending' | 'accepted' | 'picked_up' | 'completed' | 'no_show' | 'cancelled'
   // ride_type values: 'comfort' | 'xl'

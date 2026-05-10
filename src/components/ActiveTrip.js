@@ -102,12 +102,71 @@ function TripSuccessOverlay({ visible, trip, paymentMethod, onDone }) {
   );
 }
 
+// ─── Customer rating modal ────────────────────────────────────────────────────
+function CustomerRatingModal({ visible, trip, onRate }) {
+  const { colors } = useTheme();
+  const [selected, setSelected] = useState(0);
+  const scaleAnim = useRef(new Animated.Value(0.85)).current;
+  const fadeAnim  = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!visible) return;
+    setSelected(0);
+    Animated.parallel([
+      Animated.spring(scaleAnim, { toValue: 1, tension: 80, friction: 8, useNativeDriver: true }),
+      Animated.timing(fadeAnim,  { toValue: 1, duration: 200, useNativeDriver: true }),
+    ]).start();
+  }, [visible]);
+
+  return (
+    <Modal transparent visible={visible} animationType="none" statusBarTranslucent>
+      <View style={[ratingStyles.overlay, { backgroundColor: 'rgba(0,0,0,0.88)' }]}>
+        <Animated.View style={[ratingStyles.card, { backgroundColor: colors.bg, transform: [{ scale: scaleAnim }], opacity: fadeAnim }]}>
+          <Text style={[ratingStyles.title, { color: colors.textPrimary }]}>Rate this customer</Text>
+          <Text style={[ratingStyles.sub, { color: colors.textMuted }]}>{trip?.customerFull || trip?.customer}</Text>
+
+          {/* Stars */}
+          <View style={ratingStyles.stars}>
+            {[1,2,3,4,5].map(star => (
+              <TouchableOpacity key={star} onPress={() => setSelected(star)} activeOpacity={0.7}>
+                <Text style={[ratingStyles.star, { color: star <= selected ? '#F5B800' : colors.border }]}>★</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <TouchableOpacity
+            onPress={() => onRate(selected || null)}
+            activeOpacity={0.85}
+            style={[ratingStyles.btn, { backgroundColor: selected ? colors.yellow : colors.bgCard, borderColor: colors.border }]}
+          >
+            <Text style={[ratingStyles.btnText, { color: selected ? '#000' : colors.textMuted }]}>
+              {selected ? `Submit ${selected} ★` : 'Skip'}
+            </Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+}
+
+const ratingStyles = StyleSheet.create({
+  overlay: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
+  card:    { width: '100%', borderRadius: RADIUS.xxxl, padding: 32, alignItems: 'center', gap: 14 },
+  title:   { fontSize: 24, fontFamily: FONTS.black, textAlign: 'center' },
+  sub:     { fontSize: 14, fontFamily: FONTS.semiBold, textAlign: 'center', opacity: 0.7 },
+  stars:   { flexDirection: 'row', gap: 8, marginVertical: 8 },
+  star:    { fontSize: 44 },
+  btn:     { width: '100%', borderWidth: 1, borderRadius: RADIUS.xl, paddingVertical: 16, alignItems: 'center' },
+  btnText: { fontSize: 16, fontFamily: FONTS.black },
+});
+
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function ActiveTrip({ trip, onComplete, onPickUp, onNoShow, onCancel }) {
   const { colors } = useTheme();
   const { t, isRTL } = useLanguage();
   const [showPayment, setShowPayment] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showRating,  setShowRating]  = useState(false);
   const [paidMethod,  setPaidMethod]  = useState(null);
   const [elapsed,     setElapsed]     = useState(0);
   // Use acceptedAt from trip if available (restored from AsyncStorage)
@@ -190,7 +249,12 @@ export default function ActiveTrip({ trip, onComplete, onPickUp, onNoShow, onCan
 
   function handleSuccessDone() {
     setShowSuccess(false);
-    onComplete(paidMethod);
+    setShowRating(true); // show rating before completing
+  }
+
+  function handleRatingDone(stars) {
+    setShowRating(false);
+    onComplete(paidMethod, stars); // pass rating to completeTrip
   }
 
   return (
@@ -345,6 +409,12 @@ export default function ActiveTrip({ trip, onComplete, onPickUp, onNoShow, onCan
         trip={trip}
         paymentMethod={paidMethod}
         onDone={handleSuccessDone}
+      />
+
+      <CustomerRatingModal
+        visible={showRating}
+        trip={trip}
+        onRate={handleRatingDone}
       />
     </View>
   );

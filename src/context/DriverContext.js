@@ -86,8 +86,10 @@ function normalizeTrip(row) {
     phone:             row[TRIP_COLS.customerPhone]   ?? '',
     pickup:            row[TRIP_COLS.pickupAddress]   ?? '',
     dropoff:           row[TRIP_COLS.dropoffAddress]  ?? '',
-    pickupLat:         row[TRIP_COLS.pickupLat]       ?? null,
-    pickupLng:         row[TRIP_COLS.pickupLng]       ?? null,
+    pickupLat:         row[TRIP_COLS.pickupLat]        ?? null,
+    pickupLng:         row[TRIP_COLS.pickupLng]        ?? null,
+    dropoffLat:        row[TRIP_COLS.dropoffLat]       ?? null,
+    dropoffLng:        row[TRIP_COLS.dropoffLng]       ?? null,
     fare,
     fareNum,
     dist,
@@ -188,9 +190,10 @@ export function DriverProvider({ children }) {
   const currentShiftRef = useRef(null);
   const channelRef      = useRef(null);
   const activeTripIdRef = useRef(null);
-  const carTypeRef      = useRef('comfort'); // updated on goOnline from driver profile
+  const carTypeRef      = useRef('comfort');
   const isDemoRef       = useRef(false);
   const userIdRef       = useRef(null);
+  const pickupTimeRef   = useRef(null); // set when driver taps "Picked Up"
 
   // ─── Shift timer ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -614,15 +617,20 @@ export function DriverProvider({ children }) {
 
   // ─── Passenger picked up (en route to drop-off) ──────────────────────────────
   async function pickUpPassenger() {
-    const tripId = activeTripIdRef.current;
+    const tripId  = activeTripIdRef.current;
+    const now     = new Date().toISOString();
+    pickupTimeRef.current = Date.now();
     setActiveTrip(prev => {
-      const updated = prev ? { ...prev, status: 'picked_up' } : prev;
+      const updated = prev ? { ...prev, status: 'picked_up', pickupAt: now } : prev;
       if (updated) AsyncStorage.setItem(ACTIVE_TRIP_STORAGE_KEY, JSON.stringify(updated)).catch(() => {});
       return updated;
     });
     if (!isDemoRef.current && tripId) {
       try {
-        await supabase.from(TABLE_TRIPS).update({ [TRIP_COLS.status]: 'picked_up' }).eq(TRIP_COLS.id, tripId);
+        await supabase.from(TABLE_TRIPS).update({
+          [TRIP_COLS.status]:   'picked_up',
+          [TRIP_COLS.pickupAt]: now,
+        }).eq(TRIP_COLS.id, tripId);
       } catch (e) { console.warn('[DriverContext] pickUpPassenger error:', e.message); }
     }
   }
@@ -672,26 +680,47 @@ export function DriverProvider({ children }) {
   }
 
   // ─── Complete trip ────────────────────────────────────────────────────────────
-  async function completeTrip(paymentMethod = 'cash') {
-    const tripId = activeTripIdRef.current;
+  async function completeTrip(paymentMethod = 'cash', customerRating = null) {
+    const tripId  = activeTripIdRef.current;
+    const tripSnap = activeTrip; // snapshot before clearing
     activeTripIdRef.current = null;
     setActiveTrip(null);
     setDriverState(DRIVER_STATE.SCANNING);
     try { await AsyncStorage.removeItem(ACTIVE_TRIP_STORAGE_KEY); } catch {}
 
     if (isDemoRef.current) {
+      pickupTimeRef.current = null;
       clearTimeout(scanTimeoutRef.current);
       scanTimeoutRef.current = setTimeout(() => {
         setDriverState(prev => prev === DRIVER_STATE.SCANNING ? DRIVER_STATE.TRIPS : prev);
       }, 3000);
     } else if (tripId) {
+      // Normalize split payment — CRM expects 'split' not the full detail string
+      const normalizedMethod = paymentMethod.startsWith('split|') ? 'split' : paymentMethod;
+
+      // Calculate duration_min from pickupTimeRef
+      const durationMin = pickupTimeRef.current
+        ? Math.round((Date.now() - pickupTimeRef.current) / 60000)
+        : null;
+      pickupTimeRef.current = null;
+
+      // Calculate distance_km using Haversine if coords available
+      let distanceKm = null;
+      if (tripSnap?.pickupLat && tripSnap?.pickupLng && tripSnap?.dropoffLat && tripSnap?.dropoffLng) {
+        distanceKm = haversineKm(tripSnap.pickupLat, tripSnap.pickupLng, tripSnap.dropoffLat, tripSnap.dropoffLng);
+        distanceKm = Math.round(distanceKm * 10) / 10; // 1 decimal
+      }
+
       try {
         await supabase
           .from(TABLE_TRIPS)
           .update({
-            [TRIP_COLS.status]:        'completed',
-            [TRIP_COLS.paymentMethod]: paymentMethod,
-            completed_at:              new Date().toISOString(),
+            [TRIP_COLS.status]:         'completed',
+            [TRIP_COLS.paymentMethod]:  normalizedMethod,
+            [TRIP_COLS.durationMin]:    durationMin,
+            [TRIP_COLS.distanceKm]:     distanceKm,
+            ...(customerRating ? { [TRIP_COLS.customerRating]: customerRating } : {}),
+            completed_at:               new Date().toISOString(),
           })
           .eq(TRIP_COLS.id, tripId);
       } catch (e) {

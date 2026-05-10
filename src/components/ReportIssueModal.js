@@ -174,6 +174,11 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
     try {
       const { granted } = await Audio.requestPermissionsAsync();
       if (!granted) { Alert.alert('Microphone Access', 'Please allow microphone access.'); return; }
+      // Clean up any previous recording object before starting a new one
+      if (recRef.current) {
+        try { await recRef.current.stopAndUnloadAsync(); } catch {}
+        recRef.current = null;
+      }
       await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
       const { recording } = await Audio.Recording.createAsync({
         ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
@@ -278,7 +283,7 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
       if (!user) throw new Error('Not authenticated');
 
       // 1. Upload audio to incident-recordings bucket
-      const base64   = await FileSystem.readAsStringAsync(recordingUri, { encoding: FileSystem.EncodingType.Base64 });
+      const base64   = await FileSystem.readAsStringAsync(recordingUri, { encoding: 'base64' });
       const bytes    = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
       const fileName = `${user.id}/${Date.now()}.m4a`;
       const { error: uploadError } = await supabase.storage
@@ -399,22 +404,21 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
                   {isRecording
                     ? t('recordingLabel')
                     : isPlaying
-                    ? `▶  ${Math.round(playProgress * 100)}%`
+                    ? '▶  Playing…'
                     : recordingUri ? t('recordedLabel') : ''}
                 </Text>
               </View>
 
-              {/* Record button */}
+              {/* Record button — tap to start, tap again to stop */}
               {!recordingUri && (
                 <View style={styles.btnWrap}>
                   <TouchableOpacity
-                    onPressIn={startRecording}
-                    onPressOut={stopRecording}
+                    onPress={isRecording ? stopRecording : startRecording}
                     activeOpacity={0.85}
                     style={[styles.recordBtn, { backgroundColor: isRecording ? colors.red : colors.yellow, shadowColor: isRecording ? colors.red : colors.yellow }]}
                   >
                     <Text style={styles.recordBtnIcon}>{isRecording ? '⏹' : '🎙'}</Text>
-                    <Text style={styles.recordBtnText}>{isRecording ? t('releaseToStop') : t('holdToRecord')}</Text>
+                    <Text style={styles.recordBtnText}>{isRecording ? 'Tap to Stop' : 'Tap to Record'}</Text>
                   </TouchableOpacity>
                 </View>
               )}
