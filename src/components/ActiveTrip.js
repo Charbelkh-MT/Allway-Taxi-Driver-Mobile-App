@@ -317,10 +317,8 @@ export default function ActiveTrip({ trip, onComplete, onPickUp, onNoShow, onCan
           </View>
         </View>
 
-        {/* ── Actions: heading to pickup ──────────────────────────── */}
         {isAccepted && (
           <View style={styles.actionsWrap}>
-            {/* Row 1: Maps + No Show */}
             <View style={[styles.actionRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <TouchableOpacity
                 style={[styles.secondaryBtn, { backgroundColor: colors.bgCard, borderColor: colors.border, flex: 1 }]}
@@ -338,7 +336,6 @@ export default function ActiveTrip({ trip, onComplete, onPickUp, onNoShow, onCan
               </TouchableOpacity>
             </View>
 
-            {/* Row 2: Passenger Picked Up (main CTA) */}
             <TouchableOpacity onPress={handlePickUp} activeOpacity={0.85} style={styles.pickUpWrap}>
               <LinearGradient
                 colors={[colors.green, '#3DAE8A']}
@@ -349,17 +346,14 @@ export default function ActiveTrip({ trip, onComplete, onPickUp, onNoShow, onCan
               </LinearGradient>
             </TouchableOpacity>
 
-            {/* Cancel (tucked away) */}
             <TouchableOpacity onPress={handleCancel} activeOpacity={0.7} style={styles.cancelLink}>
               <Text style={[styles.cancelLinkText, { color: colors.textDisabled }]}>{t('cancelTripBtn')}</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {/* ── Actions: passenger on board ────────────────────────── */}
         {isPickedUp && (
           <View style={styles.actionsWrap}>
-            {/* Navigate to drop-off */}
             <TouchableOpacity
               style={[styles.secondaryBtn, { backgroundColor: colors.bgCard, borderColor: colors.border, width: '100%' }]}
               onPress={() => openMaps(trip.dropoff)}
@@ -368,7 +362,6 @@ export default function ActiveTrip({ trip, onComplete, onPickUp, onNoShow, onCan
               <Text style={[styles.secondaryBtnText, { color: colors.textSecondary }]}>{t('navigateDropoff')}</Text>
             </TouchableOpacity>
 
-            {/* End trip */}
             <TouchableOpacity onPress={() => setShowPayment(true)} activeOpacity={0.85} style={styles.pickUpWrap}>
               <LinearGradient
                 colors={[colors.green, '#3DAE8A']}

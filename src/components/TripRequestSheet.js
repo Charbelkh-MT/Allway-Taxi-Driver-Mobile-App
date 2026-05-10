@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  Animated, Modal, Image, Platform,
+  Animated, Modal, Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -13,7 +13,7 @@ import { FONTS, RADIUS } from '../theme';
 const COUNTDOWN_MAX = 84;
 
 function getInitialCountdown(trip) {
-  // Prefer dispatch_timeout_at from CRM (authoritative) over local calculation
+  // dispatch_timeout_at from CRM is authoritative; fall back to local calculation
   if (trip?.dispatchTimeoutAt) {
     return Math.max(0, Math.round((new Date(trip.dispatchTimeoutAt) - Date.now()) / 1000));
   }
@@ -24,11 +24,10 @@ function getInitialCountdown(trip) {
 
 async function playTripSound() {
   try {
-    // Only plays if the local file exists — haptics fire regardless
     const player = createAudioPlayer(require('../../assets/trip-alert.mp3'));
     player.play();
   } catch {
-    // File not found — haptics + push notification sound still play
+    // File missing — haptics + push notification sound still fire
   }
 }
 
@@ -41,7 +40,6 @@ export default function TripRequestSheet({ trip, onAccept, onDecline, withSound 
   const intervalRef = useRef(null);
 
   useEffect(() => {
-    // Pop in
     Animated.parallel([
       Animated.spring(scaleAnim,   { toValue: 1, tension: 120, friction: 8, useNativeDriver: true }),
       Animated.timing(opacityAnim, { toValue: 1, duration: 180, useNativeDriver: true }),
@@ -51,11 +49,10 @@ export default function TripRequestSheet({ trip, onAccept, onDecline, withSound 
     if (withSound) playTripSound();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
 
-    // If time already expired by the time driver opens app, auto-decline immediately
+    // If time already expired by the time the driver opens the app, auto-decline immediately
     const initial = getInitialCountdown(trip);
     if (initial <= 0) { onDecline(); return; }
 
-    // Countdown from remaining time
     intervalRef.current = setInterval(() => {
       setCountdown(prev => {
         if (prev <= 1) { clearInterval(intervalRef.current); onDecline(); return 0; }
@@ -87,12 +84,10 @@ export default function TripRequestSheet({ trip, onAccept, onDecline, withSound 
         <Animated.View style={[styles.cardWrap, { transform: [{ scale: scaleAnim }], opacity: opacityAnim }]}>
           <View style={[styles.card, { backgroundColor: isDark ? '#111' : '#fff', borderColor: colors.border }]}>
 
-            {/* Countdown bar */}
             <View style={[styles.timerTrack, { backgroundColor: colors.border }]}>
               <View style={[styles.timerFill, { width: `${pct * 100}%`, backgroundColor: barColor }]} />
             </View>
 
-            {/* Header: logo + title + ride type + countdown */}
             <View style={styles.header}>
               <Image
                 source={require('../../assets/allway-main-logo.jpg')}
@@ -116,16 +111,13 @@ export default function TripRequestSheet({ trip, onAccept, onDecline, withSound 
               </View>
             </View>
 
-            {/* Preferred driver banner */}
             {trip.isPreferred && (
               <View style={[styles.preferredBanner, { backgroundColor: `${colors.yellow}15`, borderColor: `${colors.yellow}40` }]}>
                 <Text style={[styles.preferredText, { color: colors.yellow }]}>{t('preferredDriver')}</Text>
               </View>
             )}
 
-            {/* Addresses — big and clear */}
             <View style={[styles.addressBlock, { backgroundColor: isDark ? '#1a1a1a' : '#f7f7f7', borderColor: colors.border }]}>
-              {/* Pickup */}
               <View style={styles.addressRow}>
                 <View style={[styles.addrDot, { backgroundColor: colors.green }]} />
                 <View style={styles.addrText}>
@@ -134,12 +126,10 @@ export default function TripRequestSheet({ trip, onAccept, onDecline, withSound 
                 </View>
               </View>
 
-              {/* Connector line */}
               <View style={styles.connectorRow}>
                 <View style={[styles.connectorLine, { backgroundColor: colors.border }]} />
               </View>
 
-              {/* Dropoff */}
               <View style={styles.addressRow}>
                 <View style={[styles.addrDot, { backgroundColor: colors.red }]} />
                 <View style={styles.addrText}>
@@ -149,7 +139,6 @@ export default function TripRequestSheet({ trip, onAccept, onDecline, withSound 
               </View>
             </View>
 
-            {/* Fare + distance + customer */}
             <View style={styles.infoRow}>
               <View style={[styles.infoCard, { backgroundColor: `${colors.yellow}15`, borderColor: `${colors.yellow}35` }]}>
                 <Text style={[styles.infoValue, { color: colors.yellow }]}>{trip.fare}</Text>
@@ -165,7 +154,6 @@ export default function TripRequestSheet({ trip, onAccept, onDecline, withSound 
               </View>
             </View>
 
-            {/* Passenger count + credit flag badges */}
             {(trip.passengerCount > 1 || trip.allowDebt) && (
               <View style={styles.badgeRow}>
                 {trip.passengerCount > 1 && (
@@ -181,7 +169,6 @@ export default function TripRequestSheet({ trip, onAccept, onDecline, withSound 
               </View>
             )}
 
-            {/* Buttons */}
             <View style={[styles.buttons, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <TouchableOpacity
                 onPress={handleDecline}
@@ -217,7 +204,6 @@ const styles = StyleSheet.create({
   timerTrack:   { height: 5 },
   timerFill:    { height: '100%' },
 
-  // Header
   header:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 14, gap: 12 },
   logo:           { width: 80, height: 36, borderRadius: 8 },
   headerCenter:   { flex: 1 },
@@ -232,7 +218,6 @@ const styles = StyleSheet.create({
   countdownNum: { fontSize: 22, fontFamily: FONTS.black, lineHeight: 26 },
   countdownSec: { fontSize: 10, fontFamily: FONTS.bold, marginTop: -2 },
 
-  // Address block
   addressBlock: { marginHorizontal: 14, borderRadius: RADIUS.xl, borderWidth: 1, padding: 16, marginBottom: 12 },
   addressRow:   { flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
   addrDot:      { width: 14, height: 14, borderRadius: 7, marginTop: 18, flexShrink: 0 },
@@ -242,18 +227,15 @@ const styles = StyleSheet.create({
   connectorRow: { paddingLeft: 6, paddingVertical: 4 },
   connectorLine:{ width: 2, height: 16, marginLeft: 0, borderRadius: 1 },
 
-  // Info cards
   infoRow:      { flexDirection: 'row', gap: 8, marginHorizontal: 14, marginBottom: 16 },
   infoCard:     { flex: 1, borderWidth: 1, borderRadius: RADIUS.lg, paddingVertical: 12, alignItems: 'center' },
   infoValue:    { fontSize: 17, fontFamily: FONTS.black, marginBottom: 3 },
   infoLabel:    { fontSize: 9, fontFamily: FONTS.extraBold, letterSpacing: 0.8 },
 
-  // Badges row
   badgeRow:      { flexDirection: 'row', gap: 8, marginHorizontal: 14, marginBottom: 12, flexWrap: 'wrap' },
   infoBadge:     { borderWidth: 1, borderRadius: 20, paddingVertical: 5, paddingHorizontal: 12 },
   infoBadgeText: { fontSize: 11, fontFamily: FONTS.extraBold },
 
-  // Buttons
   buttons:      { flexDirection: 'row', gap: 10, marginHorizontal: 14, marginBottom: 20 },
   declineBtn:   { paddingVertical: 18, paddingHorizontal: 20, borderWidth: 1, borderRadius: RADIUS.lg, alignItems: 'center' },
   declineBtnText:{ fontSize: 15, fontFamily: FONTS.extraBold },

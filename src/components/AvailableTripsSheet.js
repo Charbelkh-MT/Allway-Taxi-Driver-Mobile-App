@@ -1,24 +1,21 @@
 import React, { useRef, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal,
-  Animated, ScrollView, FlatList, Dimensions,
+  Animated, FlatList, Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { FONTS, RADIUS } from '../theme';
 
 const { width: SCREEN_W } = Dimensions.get('window');
-const CARD_W    = SCREEN_W - 48; // card content width
-const PAGE_W    = SCREEN_W;      // each page = full screen width for reliable Android paging
+// Each page = full screen width so Android paging stays in sync with the snap target
+const PAGE_W = SCREEN_W;
 
-// ─── Single trip card (full details) ─────────────────────────────────────────
 function TripCard({ trip, onAccept, colors, isDark }) {
   return (
     <View style={[styles.card, { backgroundColor: colors.bgCard, borderColor: colors.border }]}>
 
-      {/* Fare hero */}
       <View style={[styles.fareRow, { backgroundColor: `${colors.yellow}12`, borderColor: `${colors.yellow}30` }]}>
         <View>
           <Text style={[styles.fareVal, { color: colors.yellow }]}>{trip.fare}</Text>
@@ -31,7 +28,6 @@ function TripCard({ trip, onAccept, colors, isDark }) {
         )}
       </View>
 
-      {/* Route */}
       <View style={[styles.routeCard, { backgroundColor: isDark ? '#1a1a1a' : '#f8f8f8', borderColor: colors.border }]}>
         <View style={styles.addrRow}>
           <View style={[styles.addrDot, { backgroundColor: colors.green }]} />
@@ -50,7 +46,6 @@ function TripCard({ trip, onAccept, colors, isDark }) {
         </View>
       </View>
 
-      {/* Customer */}
       <View style={[styles.customerCard, { backgroundColor: isDark ? '#1a1a1a' : '#f8f8f8', borderColor: colors.border }]}>
         <View style={[styles.avatarCircle, { backgroundColor: `${colors.yellow}20` }]}>
           <Text style={[styles.avatarText, { color: colors.yellow }]}>
@@ -68,7 +63,6 @@ function TripCard({ trip, onAccept, colors, isDark }) {
         <Text style={[styles.custLabel, { color: colors.textDisabled }]}>RIDER</Text>
       </View>
 
-      {/* Accept */}
       <TouchableOpacity
         onPress={async () => {
           await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -89,10 +83,8 @@ function TripCard({ trip, onAccept, colors, isDark }) {
   );
 }
 
-// ─── Main popup ───────────────────────────────────────────────────────────────
 export default function AvailableTripsSheet({ trips, onAccept, onClose }) {
   const { colors, isDark } = useTheme();
-  const insets    = useSafeAreaInsets();
   const scaleAnim = useRef(new Animated.Value(0.88)).current;
   const fadeAnim  = useRef(new Animated.Value(0)).current;
   const flatRef   = useRef(null);
@@ -124,7 +116,6 @@ export default function AvailableTripsSheet({ trips, onAccept, onClose }) {
 
         <Animated.View style={[styles.popup, { backgroundColor: colors.bg, transform: [{ scale: scaleAnim }], opacity: fadeAnim }]}>
 
-          {/* Header */}
           <View style={styles.popupHeader}>
             <View>
               <Text style={[styles.popupTitle, { color: colors.textPrimary }]}>
@@ -142,7 +133,6 @@ export default function AvailableTripsSheet({ trips, onAccept, onClose }) {
             </TouchableOpacity>
           </View>
 
-          {/* Dot indicators */}
           {trips.length > 1 && (
             <View style={styles.dots}>
               {trips.map((_, i) => (
@@ -158,7 +148,7 @@ export default function AvailableTripsSheet({ trips, onAccept, onClose }) {
             </View>
           )}
 
-          {/* Swipeable cards — each item is PAGE_W wide so pagingEnabled works on Android */}
+          {/* Each item is PAGE_W wide so pagingEnabled snaps correctly on Android */}
           <FlatList
             ref={flatRef}
             data={trips}
@@ -210,9 +200,6 @@ const styles = StyleSheet.create({
   dots:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingBottom: 12 },
   dot:   { height: 7, borderRadius: 4 },
 
-  carouselContent: { paddingBottom: 20 },
-
-  // Card
   card:       { borderWidth: 1, borderRadius: RADIUS.xxl, overflow: 'hidden', gap: 10, padding: 16 },
 
   fareRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderRadius: RADIUS.xl, paddingVertical: 14, paddingHorizontal: 16 },

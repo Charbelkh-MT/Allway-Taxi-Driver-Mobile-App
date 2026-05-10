@@ -1,9 +1,8 @@
-// Background GPS task — must be imported in App.js before the app tree renders.
-// TaskManager.defineTask runs at module level so the OS can wake this task
-// even when the app is backgrounded or suspended.
+// Background GPS task — must be imported in App.js before the app tree renders so
+// TaskManager.defineTask runs at module level and the OS can wake the task while the
+// app is backgrounded or suspended.
 //
-// NOTE: Background location does NOT work in Expo Go.
-// You must use a Development Build or Production Build (EAS Build).
+// Background location does NOT work in Expo Go — requires a Development or EAS Build.
 
 import * as TaskManager from 'expo-task-manager';
 import * as Location from 'expo-location';
@@ -13,7 +12,6 @@ import { TABLE_LOCATIONS } from '../config';
 
 export const LOCATION_TASK_NAME = 'allway-background-location';
 
-// ─── Task Definition (module-level, required by TaskManager) ─────────────────
 TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
   if (error) {
     console.warn('[GPS Task] Error:', error.message);
@@ -28,7 +26,6 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
 
   console.log(`[GPS] lat=${lat.toFixed(6)}  lng=${lng.toFixed(6)}  heading=${heading.toFixed(1)}°  speed=${speed.toFixed(1)}m/s`);
 
-  // Get the currently authenticated driver — safe to call in background context
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
 
@@ -46,20 +43,17 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
   );
 });
 
-// ─── Start tracking (call when driver goes online) ────────────────────────────
 export async function startLocationTracking() {
-  // Request foreground permission first (required before background)
+  // Foreground permission is required before background can be requested
   const { status: fg } = await Location.requestForegroundPermissionsAsync();
   if (fg !== 'granted') {
     console.warn('[GPS] Foreground location permission denied');
     return false;
   }
 
-  // Request background permission (shows system dialog on iOS/Android)
   const { status: bg } = await Location.requestBackgroundPermissionsAsync();
   if (bg !== 'granted') {
     console.warn('[GPS] Background location permission denied — tracking only while app is open');
-    // Still track in foreground with a simpler interval-based approach
     return 'foreground-only';
   }
 
@@ -84,13 +78,12 @@ export async function startLocationTracking() {
     console.log('[GPS] Background tracking started');
     return true;
   } catch (e) {
-    // expo-task-manager is not available in Expo Go — caller will use foreground fallback
+    // expo-task-manager isn't available in Expo Go — caller falls back to foreground tracking
     console.log('[GPS] Background task unavailable, using foreground fallback:', e.message);
     return false;
   }
 }
 
-// ─── Stop tracking (call when driver goes offline) ────────────────────────────
 export async function stopLocationTracking() {
   try {
     const isTracking = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME);
@@ -98,7 +91,7 @@ export async function stopLocationTracking() {
       await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
     }
 
-    // Mark driver as offline in Supabase so CRM map shows correct status
+    // Mark driver offline so the CRM map reflects the correct status
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       await supabase.from(TABLE_LOCATIONS).upsert(

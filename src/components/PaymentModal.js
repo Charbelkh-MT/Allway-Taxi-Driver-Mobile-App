@@ -10,11 +10,10 @@ import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 import { FONTS, RADIUS } from '../theme';
 
-// ─── Company accounts (replace with real numbers before go-live) ──────────────
+// TODO: replace with real numbers before go-live
 const WISH_NUMBER   = '+961 71 234 567';
 const WALLET_NUMBER = '+961 70 987 654';
 
-// ─── Payment method definitions ───────────────────────────────────────────────
 const ALL_METHODS = [
   { id: 'cash',   icon: '💵', labelKey: 'cash',   subKey: 'cashSub',   color: 'green'  },
   { id: 'card',   icon: '💳', labelKey: 'card',   subKey: 'cardSub',   color: 'yellow' },
@@ -27,7 +26,7 @@ function formatSplitPayment(method1, amount1, method2, amount2) {
   return `split|${method1}|${amount1.toFixed(2)}|${method2}|${amount2.toFixed(2)}`;
 }
 
-// ─── Official Whish Money logo (SVG from whish.money) ────────────────────────
+// Official Whish Money logo from whish.money
 const WHISH_SVG = `<svg viewBox="0 0 123.91 27.58" xmlns="http://www.w3.org/2000/svg">
   <path fill="#FF003E" d="M67.96,5.4c-0.15-1.49-1.34-2.68-2.88-2.89c-1.49-0.2-2.72,0.58-3.26,2.06c-0.52,1.45-0.98,2.95-1.42,4.4c-0.19,0.61-0.37,1.23-0.56,1.84c-0.29,0.91-0.57,1.82-0.85,2.73l-0.24,0.76l-0.03,0l-0.31-0.86c-0.27-0.76-0.54-1.52-0.82-2.27c-0.22-0.6-0.44-1.2-0.66-1.8c-0.62-1.69-1.26-3.44-1.95-5.14c-0.46-1.13-1.44-1.75-2.79-1.75c-1.34,0.01-2.3,0.62-2.85,1.83c-0.27,0.59-0.49,1.12-0.67,1.62c-0.77,2.14-1.54,4.28-2.3,6.42l-0.7,1.96l-0.07,0l-0.1-0.3c-0.12-0.35-0.24-0.71-0.36-1.07c-0.28-0.86-0.56-1.73-0.84-2.6c-0.59-1.84-1.21-3.74-1.84-5.6c-0.48-1.41-1.54-2.26-2.84-2.26c-0.02,0-0.04,0-0.06,0c-0.02,0-0.03-0.02-0.05-0.02H25.61c-0.1,0-0.18,0.07-0.19,0.16c-0.01,0.09,0.04,0.18,0.13,0.21l10.7,3.18H8.82c-0.1,0-0.18,0.08-0.19,0.18C8.63,6.32,8.7,6.4,8.8,6.42l27.9,3.71H1.74c-0.1,0-0.18,0.08-0.19,0.18c-0.01,0.1,0.06,0.19,0.16,0.2l37.1,5.54H16.16c-0.1,0-0.18,0.07-0.19,0.17c-0.01,0.1,0.06,0.19,0.15,0.21l24.9,4.63H26.26c-0.1,0-0.18,0.07-0.19,0.17c-0.01,0.09,0.05,0.19,0.14,0.21l18.33,4.53c0.09,0.03,0.18,0.05,0.27,0.07L45,26.08c0.02,0,0.03,0.01,0.05,0.01c0,0,0,0,0.01,0c0.17,0.02,0.34,0.04,0.52,0.04c1.38,0,2.34-0.64,2.84-1.91c0.56-1.41,1.11-2.82,1.66-4.23l0.33-0.85c0.38-0.98,0.76-1.96,1.18-3.02l0.58-1.49c0.04,0.08,0.07,0.16,0.1,0.23c0.15,0.33,0.25,0.57,0.35,0.81c0.36,0.9,0.72,1.8,1.07,2.7c0.75,1.91,1.53,3.88,2.34,5.81c0.53,1.26,1.6,2.01,2.88,2.01c0.38,0,0.76-0.07,1.13-0.21c1.26-0.46,1.75-1.58,2.1-2.58c1.7-4.83,3.46-9.94,5.55-16.09C67.85,6.81,68.03,6.09,67.96,5.4z"/>
   <path fill="#606060" d="M80.07,15.55h-1.2c-0.1,0-0.19-0.06-0.22-0.16l-1.82-5.5l-1.79,5.5c-0.03,0.1-0.12,0.16-0.22,0.16h-1.2c-0.1,0-0.19-0.06-0.22-0.16l-2.39-7.56C71,7.76,71.01,7.68,71.06,7.62c0.04-0.06,0.11-0.09,0.19-0.09h1.18c0.1,0,0.19,0.07,0.22,0.17l1.63,5.49l1.82-5.49c0.03-0.09,0.12-0.16,0.22-0.16h1.07c0.1,0,0.19,0.06,0.22,0.16l1.85,5.5l1.62-5.49c0.03-0.1,0.12-0.17,0.22-0.17h1.16c0.07,0,0.14,0.03,0.19,0.09c0.04,0.06,0.06,0.14,0.03,0.21l-2.39,7.56C80.26,15.49,80.17,15.55,80.07,15.55z"/>
@@ -37,7 +36,7 @@ const WHISH_SVG = `<svg viewBox="0 0 123.91 27.58" xmlns="http://www.w3.org/2000
   <path fill="#606060" d="M121.91,15.55h-1.1c-0.13,0-0.23-0.1-0.23-0.23v-4.19c0-0.38-0.03-0.73-0.09-1.04c-0.06-0.29-0.16-0.54-0.3-0.75c-0.13-0.2-0.32-0.35-0.54-0.46c-0.4-0.2-1.05-0.27-1.65-0.01c-0.24,0.1-0.46,0.27-0.65,0.48c-0.19,0.22-0.35,0.5-0.47,0.84c-0.12,0.35-0.18,0.76-0.18,1.24v3.88c0,0.13-0.1,0.23-0.23,0.23h-1.1c-0.13,0-0.23-0.1-0.23-0.23V3.1c0-0.13,0.1-0.23,0.23-0.23h1.1c0.13,0,0.23,0.1,0.23,0.23v5.19c0.19-0.21,0.43-0.39,0.71-0.54c0.51-0.28,1.06-0.42,1.63-0.42c1.03,0,1.81,0.31,2.34,0.94c0.51,0.61,0.77,1.42,0.77,2.41v4.64C122.14,15.45,122.04,15.55,121.91,15.55z"/>
 </svg>`;
 
-// Show only the red W mark — crop viewBox to the left wave portion only
+// Crop the viewBox to the left wave so only the red W mark renders
 const WHISH_W_ONLY = `<svg viewBox="0 0 68 27.58" xmlns="http://www.w3.org/2000/svg">
   <path fill="#FF003E" d="M67.96,5.4c-0.15-1.49-1.34-2.68-2.88-2.89c-1.49-0.2-2.72,0.58-3.26,2.06c-0.52,1.45-0.98,2.95-1.42,4.4c-0.19,0.61-0.37,1.23-0.56,1.84c-0.29,0.91-0.57,1.82-0.85,2.73l-0.24,0.76l-0.03,0l-0.31-0.86c-0.27-0.76-0.54-1.52-0.82-2.27c-0.22-0.6-0.44-1.2-0.66-1.8c-0.62-1.69-1.26-3.44-1.95-5.14c-0.46-1.13-1.44-1.75-2.79-1.75c-1.34,0.01-2.3,0.62-2.85,1.83c-0.27,0.59-0.49,1.12-0.67,1.62c-0.77,2.14-1.54,4.28-2.3,6.42l-0.7,1.96l-0.07,0l-0.1-0.3c-0.12-0.35-0.24-0.71-0.36-1.07c-0.28-0.86-0.56-1.73-0.84-2.6c-0.59-1.84-1.21-3.74-1.84-5.6c-0.48-1.41-1.54-2.26-2.84-2.26c-0.02,0-0.04,0-0.06,0c-0.02,0-0.03-0.02-0.05-0.02H25.61c-0.1,0-0.18,0.07-0.19,0.16c-0.01,0.09,0.04,0.18,0.13,0.21l10.7,3.18H8.82c-0.1,0-0.18,0.08-0.19,0.18C8.63,6.32,8.7,6.4,8.8,6.42l27.9,3.71H1.74c-0.1,0-0.18,0.08-0.19,0.18c-0.01,0.1,0.06,0.19,0.16,0.2l37.1,5.54H16.16c-0.1,0-0.18,0.07-0.19,0.17c-0.01,0.1,0.06,0.19,0.15,0.21l24.9,4.63H26.26c-0.1,0-0.18,0.07-0.19,0.17c-0.01,0.09,0.05,0.19,0.14,0.21l18.33,4.53c0.09,0.03,0.18,0.05,0.27,0.07L45,26.08c0.02,0,0.03,0.01,0.05,0.01c0,0,0,0,0.01,0c0.17,0.02,0.34,0.04,0.52,0.04c1.38,0,2.34-0.64,2.84-1.91c0.56-1.41,1.11-2.82,1.66-4.23l0.33-0.85c0.38-0.98,0.76-1.96,1.18-3.02l0.58-1.49c0.04,0.08,0.07,0.16,0.1,0.23c0.15,0.33,0.25,0.57,0.35,0.81c0.36,0.9,0.72,1.8,1.07,2.7c0.75,1.91,1.53,3.88,2.34,5.81c0.53,1.26,1.6,2.01,2.88,2.01c0.38,0,0.76-0.07,1.13-0.21c1.26-0.46,1.75-1.58,2.1-2.58c1.7-4.83,3.46-9.94,5.55-16.09C67.85,6.81,68.03,6.09,67.96,5.4z"/>
 </svg>`;
@@ -47,7 +46,6 @@ function WishLogo({ size = 26 }) {
   return <SvgXml xml={WHISH_W_ONLY} width={w} height={size} />;
 }
 
-// ─── Method chip row for split payment ───────────────────────────────────────
 function MethodChips({ methods, selected, onSelect, colors }) {
   return (
     <View style={chipStyles.row}>
@@ -81,7 +79,6 @@ function MethodChips({ methods, selected, onSelect, colors }) {
   );
 }
 
-// ─── Confirmation screen for each method ─────────────────────────────────────
 function BackArrow({ onBack, colors }) {
   return (
     <TouchableOpacity onPress={onBack} style={arrowStyles.btn} activeOpacity={0.7}>
@@ -90,7 +87,7 @@ function BackArrow({ onBack, colors }) {
   );
 }
 
-function ConfirmationScreen({ method, fare, fareNum, colors, isRTL, onConfirm, onBack, t }) {
+function ConfirmationScreen({ method, fare, colors, onConfirm, onBack }) {
   const configs = {
     cash: {
       header:    '💵 Cash Payment',
@@ -138,10 +135,8 @@ function ConfirmationScreen({ method, fare, fareNum, colors, isRTL, onConfirm, o
 
   return (
     <View style={confirmStyles.container}>
-      {/* Back arrow top left */}
       <BackArrow onBack={onBack} colors={colors} />
 
-      {/* Header */}
       <View style={[confirmStyles.headerBox, { borderColor: `${cfg.accent}30`, backgroundColor: method === 'wish' ? '#fff' : `${cfg.accent}10` }]}>
         {method === 'wish' ? (
           <View style={{ paddingHorizontal: 12, paddingVertical: 8 }}>
@@ -152,30 +147,25 @@ function ConfirmationScreen({ method, fare, fareNum, colors, isRTL, onConfirm, o
         )}
       </View>
 
-      {/* Instruction line */}
       {cfg.lines.map((line, i) => (
         <Text key={i} style={[confirmStyles.instruction, { color: colors.textMuted }]}>{line}</Text>
       ))}
 
-      {/* Account number (Wish / Wallet) */}
       {cfg.account && (
         <View style={[confirmStyles.accountBox, { backgroundColor: colors.bgCard, borderColor: colors.border }]}>
           <Text style={[confirmStyles.accountNum, { color: colors.textPrimary }]}>{cfg.account}</Text>
         </View>
       )}
 
-      {/* Fare amount — big and clear */}
       <View style={[confirmStyles.fareBox, { borderColor: `${cfg.accent}40`, backgroundColor: `${cfg.accent}12` }]}>
         <Text style={[confirmStyles.fareVal, { color: cfg.accent }]}>{fare}</Text>
         <Text style={[confirmStyles.fareLabel, { color: colors.textMuted }]}>AMOUNT</Text>
       </View>
 
-      {/* Note */}
       <View style={[confirmStyles.noteBox, { backgroundColor: colors.bgCard, borderColor: colors.border }]}>
         <Text style={[confirmStyles.noteText, { color: colors.textMuted }]}>ⓘ  {cfg.note}</Text>
       </View>
 
-      {/* Confirm button */}
       <TouchableOpacity
         onPress={onConfirm}
         activeOpacity={0.85}
@@ -190,7 +180,6 @@ function ConfirmationScreen({ method, fare, fareNum, colors, isRTL, onConfirm, o
   );
 }
 
-// ─── Split confirmation ───────────────────────────────────────────────────────
 function SplitConfirmationScreen({ method1, amount1, method2, amount2, fare, colors, onConfirm, onBack }) {
   const icons = { cash: '💵', card: '💳', wish: null, wallet: '💰', debt: '📋' };
   const labels = { cash: 'Cash', card: 'Card', wish: 'Whish', wallet: 'Wallet', debt: 'Account' };
@@ -204,7 +193,6 @@ function SplitConfirmationScreen({ method1, amount1, method2, amount2, fare, col
 
       <Text style={[confirmStyles.instruction, { color: colors.textMuted }]}>Total fare: {fare}</Text>
 
-      {/* Method 1 */}
       <View style={[confirmStyles.splitRow, { backgroundColor: colors.bgCard, borderColor: colors.border }]}>
         <View style={confirmStyles.splitLeft}>
           {icons[method1] ? (
@@ -217,7 +205,6 @@ function SplitConfirmationScreen({ method1, amount1, method2, amount2, fare, col
         <Text style={[confirmStyles.splitAmount, { color: colors.green }]}>${parseFloat(amount1).toFixed(2)}</Text>
       </View>
 
-      {/* Method 2 */}
       <View style={[confirmStyles.splitRow, { backgroundColor: colors.bgCard, borderColor: colors.border }]}>
         <View style={confirmStyles.splitLeft}>
           {icons[method2] ? (
@@ -242,7 +229,6 @@ function SplitConfirmationScreen({ method1, amount1, method2, amount2, fare, col
   );
 }
 
-// ─── Main modal ───────────────────────────────────────────────────────────────
 export default function PaymentModal({ trip, visible, onComplete, onCancel }) {
   const { colors } = useTheme();
   const { t, isRTL } = useLanguage();
@@ -334,7 +320,6 @@ export default function PaymentModal({ trip, visible, onComplete, onCancel }) {
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <Animated.View style={{ opacity: stepAnim, transform: [{ translateY: stepAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }] }}>
 
-            {/* ── STEP: Select method ── */}
             {step === 'select' && (
               <>
                 <View style={styles.header}>
@@ -377,7 +362,6 @@ export default function PaymentModal({ trip, visible, onComplete, onCancel }) {
                   );
                 })}
 
-                {/* Split payment */}
                 {totalFare > 0 && (
                   <TouchableOpacity
                     onPress={() => animateStep('split')}
@@ -399,21 +383,16 @@ export default function PaymentModal({ trip, visible, onComplete, onCancel }) {
               </>
             )}
 
-            {/* ── STEP: Method confirmation ── */}
             {step === 'confirm' && chosenMethod && (
               <ConfirmationScreen
                 method={chosenMethod}
                 fare={trip?.fare ?? '$0'}
-                fareNum={totalFare}
                 colors={colors}
-                isRTL={isRTL}
                 onConfirm={confirmPayment}
                 onBack={() => animateStep('select')}
-                t={t}
               />
             )}
 
-            {/* ── STEP: Split — enter amounts ── */}
             {step === 'split' && (
               <>
                 <View style={styles.header}>
@@ -425,7 +404,6 @@ export default function PaymentModal({ trip, visible, onComplete, onCancel }) {
                   )}
                 </View>
 
-                {/* First payment */}
                 <View style={[styles.splitSection, { borderColor: colors.border, backgroundColor: colors.bgCard }]}>
                   <Text style={[styles.splitSectionLabel, { color: colors.textMuted }]}>{t('firstPayment')}</Text>
                   <MethodChips methods={ALL_METHODS} selected={splitMethod1} onSelect={setSplitMethod1} colors={colors} />
@@ -446,7 +424,6 @@ export default function PaymentModal({ trip, visible, onComplete, onCancel }) {
                   </View>
                 </View>
 
-                {/* Second payment */}
                 <View style={[styles.splitSection, { borderColor: colors.border, backgroundColor: colors.bgCard }]}>
                   <Text style={[styles.splitSectionLabel, { color: colors.textMuted }]}>{t('secondPayment')}</Text>
                   <MethodChips methods={ALL_METHODS} selected={splitMethod2} onSelect={setSplitMethod2} colors={colors} />
@@ -471,7 +448,6 @@ export default function PaymentModal({ trip, visible, onComplete, onCancel }) {
               </>
             )}
 
-            {/* ── STEP: Split confirmation ── */}
             {step === 'splitConfirm' && (
               <SplitConfirmationScreen
                 method1={splitMethod1}
@@ -493,13 +469,11 @@ export default function PaymentModal({ trip, visible, onComplete, onCancel }) {
   );
 }
 
-// ─── Back arrow styles ────────────────────────────────────────────────────────
 const arrowStyles = StyleSheet.create({
   btn:   { alignSelf: 'flex-start', paddingVertical: 4, paddingRight: 16, marginBottom: 4 },
   arrow: { fontSize: 36, lineHeight: 36, fontFamily: FONTS.black },
 });
 
-// ─── Confirmation styles ──────────────────────────────────────────────────────
 const confirmStyles = StyleSheet.create({
   container:   { paddingHorizontal: 4, paddingTop: 8, gap: 12 },
   headerBox:   { borderWidth: 1, borderRadius: RADIUS.xl, paddingVertical: 18, alignItems: 'center', justifyContent: 'center' },
@@ -514,15 +488,12 @@ const confirmStyles = StyleSheet.create({
   noteText:    { fontSize: 12, fontFamily: FONTS.semiBold, lineHeight: 18 },
   confirmBtn:  { borderRadius: RADIUS.xl, paddingVertical: 18, alignItems: 'center', marginTop: 4 },
   confirmText: { fontSize: 15, fontFamily: FONTS.black },
-  backBtn:     { alignItems: 'center', paddingVertical: 14 },
-  backText:    { fontSize: 13, fontFamily: FONTS.semiBold },
   splitRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderRadius: RADIUS.xl, paddingVertical: 16, paddingHorizontal: 20 },
   splitLeft:   { flexDirection: 'row', alignItems: 'center', gap: 12 },
   splitLabel:  { fontSize: 16, fontFamily: FONTS.black },
   splitAmount: { fontSize: 22, fontFamily: FONTS.black },
 });
 
-// ─── Chip styles ──────────────────────────────────────────────────────────────
 const chipStyles = StyleSheet.create({
   row:   { flexDirection: 'row', gap: 8, marginBottom: 12 },
   chip:  { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: RADIUS.md, borderWidth: 1.5, gap: 4 },
@@ -530,7 +501,6 @@ const chipStyles = StyleSheet.create({
   label: { fontSize: 9, fontFamily: FONTS.extraBold, letterSpacing: 0.5 },
 });
 
-// ─── Main styles ──────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   overlay:     { flex: 1, justifyContent: 'flex-end' },
   sheet:       { borderTopLeftRadius: RADIUS.xxxl, borderTopRightRadius: RADIUS.xxxl, paddingTop: 12, paddingHorizontal: 20, maxHeight: '92%' },

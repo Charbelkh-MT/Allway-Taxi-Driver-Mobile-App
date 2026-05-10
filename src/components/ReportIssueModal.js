@@ -13,7 +13,6 @@ import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 import { FONTS, RADIUS } from '../theme';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
 const BAR_COUNT = 40;
 const POLL_MS   = 80;
 const MIN_DB    = -55;
@@ -44,7 +43,6 @@ function fmt(s) {
   return `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
 }
 
-// ─── Recording waveform (live bars while recording) ──────────────────────────
 function RecordingWaveform({ levels, color }) {
   return (
     <View style={waveStyles.container}>
@@ -55,8 +53,7 @@ function RecordingWaveform({ levels, color }) {
   );
 }
 
-// ─── WhatsApp-style playback waveform ────────────────────────────────────────
-// Uses Animated.Value so progress updates bypass React reconciler — smooth, no re-renders
+// Uses Animated.Value so progress updates bypass the React reconciler — no re-renders
 function PlaybackWaveform({ levels, progressAnim, color, dimColor }) {
   const [containerW, setContainerW] = useState(300);
 
@@ -74,12 +71,11 @@ function PlaybackWaveform({ levels, progressAnim, color, dimColor }) {
       style={waveStyles.container}
       onLayout={e => setContainerW(e.nativeEvent.layout.width)}
     >
-      {/* Dimmed base bars — static, never re-render */}
       {levels.map((lvl, i) => (
         <View key={i} style={[waveStyles.bar, { height: Math.max(3, lvl * 42), backgroundColor: dimColor, opacity: 0.3 }]} />
       ))}
 
-      {/* Colored overlay clipped to played portion — native animation */}
+      {/* Colored overlay clipped to the played portion — native-driven */}
       <Animated.View style={[waveStyles.overlay, { width: overlayWidth }]}>
         <View style={[waveStyles.innerRow, { width: containerW }]}>
           {levels.map((lvl, i) => (
@@ -88,7 +84,6 @@ function PlaybackWaveform({ levels, progressAnim, color, dimColor }) {
         </View>
       </Animated.View>
 
-      {/* Moving circle playhead */}
       <Animated.View style={[waveStyles.playhead, { backgroundColor: color, left: circleLeft }]} />
     </View>
   );
@@ -102,7 +97,6 @@ const waveStyles = StyleSheet.create({
   playhead:  { width: 13, height: 13, borderRadius: 7, position: 'absolute', top: '50%', marginTop: -6 },
 });
 
-// ─── Selector chips ───────────────────────────────────────────────────────────
 function ChipSelector({ options, selected, onSelect, colors }) {
   return (
     <View style={chipStyles.row}>
@@ -132,7 +126,6 @@ const chipStyles = StyleSheet.create({
   label: { fontSize: 12, fontFamily: FONTS.bold },
 });
 
-// ─── Main modal ───────────────────────────────────────────────────────────────
 export default function ReportIssueModal({ visible, onClose, activeTripId = null }) {
   const { colors } = useTheme();
   const { t }      = useLanguage();
@@ -169,12 +162,10 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
     ]).start();
   }, [visible]);
 
-  // ─── Recording ───────────────────────────────────────────────────────────────
   async function startRecording() {
     try {
       const { granted } = await Audio.requestPermissionsAsync();
       if (!granted) { Alert.alert('Microphone Access', 'Please allow microphone access.'); return; }
-      // Clean up any previous recording object before starting a new one
       if (recRef.current) {
         try { await recRef.current.stopAndUnloadAsync(); } catch {}
         recRef.current = null;
@@ -241,7 +232,7 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
       sound.setOnPlaybackStatusUpdate(status => {
         if (!status.isLoaded) return;
         if (status.durationMillis) {
-          // Direct setValue bypasses React — no re-renders, silky smooth
+          // Direct setValue bypasses React for a silky-smooth update
           progressAnim.setValue(status.positionMillis / status.durationMillis);
         }
         if (status.didJustFinish) {
@@ -273,7 +264,6 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
     levelsRef.current = Array(BAR_COUNT).fill(0);
   }
 
-  // ─── Submit ───────────────────────────────────────────────────────────────────
   async function handleSend() {
     if (!recordingUri) { Alert.alert('Voice Required', 'Please record a voice message before submitting.'); return; }
     setIsSending(true);
@@ -282,7 +272,6 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // 1. Upload audio to incident-recordings bucket
       const base64   = await FileSystem.readAsStringAsync(recordingUri, { encoding: 'base64' });
       const bytes    = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
       const fileName = `${user.id}/${Date.now()}.m4a`;
@@ -291,14 +280,14 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
         .upload(fileName, bytes, { contentType: 'audio/m4a', upsert: false });
       if (uploadError) throw uploadError;
 
-      // 2. Insert into incidents table — store path only (CRM uses service role to access)
+      // Store the storage path only — CRM generates signed URLs on demand via the service role
       await supabase.from(TABLE_INCIDENTS).insert({
         driver_id:     user.id,
         trip_id:       activeTripId ?? null,
         title:         title || `Incident report — ${new Date().toLocaleDateString()}`,
         incident_type: incidentType,
         severity,
-        voice_path:    fileName,  // CRM generates signed URL on demand
+        voice_path:    fileName,
         submitted_by:  'driver',
       });
 
@@ -343,7 +332,6 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
 
           {!sent ? (
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-              {/* Header */}
               <View style={styles.header}>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.title, { color: colors.textPrimary }]}>{t('reportIssueTitle')}</Text>
@@ -354,7 +342,6 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
                 </TouchableOpacity>
               </View>
 
-              {/* Title input */}
               <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>TITLE (optional)</Text>
               <TextInput
                 style={[styles.titleInput, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.bgCard }]}
@@ -365,15 +352,12 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
                 maxLength={100}
               />
 
-              {/* Incident type */}
               <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>INCIDENT TYPE</Text>
               <ChipSelector options={INCIDENT_TYPES} selected={incidentType} onSelect={setIncidentType} colors={colors} />
 
-              {/* Severity */}
               <Text style={[styles.fieldLabel, { color: colors.textMuted, marginTop: 16 }]}>SEVERITY</Text>
               <ChipSelector options={SEVERITIES} selected={severity} onSelect={setSeverity} colors={colors} />
 
-              {/* Voice recorder */}
               <Text style={[styles.fieldLabel, { color: colors.textMuted, marginTop: 16 }]}>VOICE MESSAGE</Text>
               <View style={[styles.waveContainer, {
                 backgroundColor: isRecording ? `${colors.red}12` : recordingUri ? `${accentColor}12` : colors.bgCard,
@@ -383,7 +367,6 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
                   color: isRecording ? colors.red : recordingUri ? accentColor : colors.textDisabled,
                 }]}>{fmt(duration)}</Text>
 
-                {/* Waveform — recording: live bars | playback: WhatsApp progress */}
                 {recordingUri ? (
                   <PlaybackWaveform
                     levels={savedLevels}
@@ -409,7 +392,6 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
                 </Text>
               </View>
 
-              {/* Record button — tap to start, tap again to stop */}
               {!recordingUri && (
                 <View style={styles.btnWrap}>
                   <TouchableOpacity
@@ -423,11 +405,9 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
                 </View>
               )}
 
-              {/* Playback + actions — WhatsApp style */}
               {!!recordingUri && (
                 <>
                   <View style={styles.playbackRow}>
-                    {/* Circular play/pause button */}
                     <TouchableOpacity
                       onPress={isPlaying ? stopPlayback : playBack}
                       activeOpacity={0.85}
@@ -436,7 +416,6 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
                       <Text style={styles.playCircleIcon}>{isPlaying ? '⏸' : '▶'}</Text>
                     </TouchableOpacity>
 
-                    {/* Re-record button */}
                     <TouchableOpacity onPress={() => { stopPlayback(); resetRecording(); }} activeOpacity={0.75}
                       style={[styles.reRecordBtn, { borderColor: colors.yellow, backgroundColor: `${colors.yellow}15` }]}>
                       <Text style={[styles.reRecordText, { color: colors.yellow }]}>{t('reRecord')}</Text>
