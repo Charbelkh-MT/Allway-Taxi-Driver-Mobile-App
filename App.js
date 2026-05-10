@@ -2,8 +2,9 @@ import 'react-native-url-polyfill/auto';
 import './src/utils/locationTask';
 import 'react-native-gesture-handler';
 
-import React, { useCallback, useMemo } from 'react';
-import { View, StyleSheet } from 'react-native';
+import React, { useCallback, useMemo, useEffect } from 'react';
+import { View, StyleSheet, Platform } from 'react-native';
+import * as NavigationBar from 'expo-navigation-bar';
 import { NavigationContainer, DarkTheme, DefaultTheme } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
@@ -30,6 +31,12 @@ function AppInner() {
   const { isDark, colors }                                          = useTheme();
   const { isAuthenticated }                                                         = useAuth();
   const { showTripSheet, pendingTrip, tripSoundEnabled, acceptTrip, closeTripSheet } = useDriver();
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    NavigationBar.setBackgroundColorAsync(isDark ? '#000000' : '#FFFFFF');
+    NavigationBar.setButtonStyleAsync(isDark ? 'light' : 'dark');
+  }, [isDark]);
 
   const navTheme = useMemo(() => isDark
     ? { ...DarkTheme,    colors: { ...DarkTheme.colors,    background: 'transparent' } }
