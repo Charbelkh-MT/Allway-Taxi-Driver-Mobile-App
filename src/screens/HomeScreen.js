@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useDriver, DRIVER_STATE } from '../context/DriverContext';
-import { FONTS, RADIUS } from '../theme';
+import { FONTS } from '../theme';
 import { getWeekBounds } from '../utils/dateUtils';
 import AppHeader from '../components/AppHeader';
 import FadeInView from '../components/FadeInView';
@@ -22,7 +22,7 @@ import { TABLE_TRIPS, TRIP_COLS } from '../config';
 
 export default function HomeScreen() {
   const { colors } = useTheme();
-  const { t, isRTL } = useLanguage();
+  const { t } = useLanguage();
   const { driver, savePushToken } = useAuth();
   const {
     driverState, activeTrip, showTripSheet,
@@ -49,8 +49,7 @@ export default function HomeScreen() {
   const [weeklyData, setWeeklyData] = useState({ bars: [0,0,0,0,0,0,0], todayIndex: 0, earned: 0, trips: 0, tripsToday: 0, earnedToday: 0 });
   const [earningsLoading, setEarningsLoading] = useState(true);
 
-  // Tracks whether the initial fetch has completed so the driverState effect
-  // does not trigger a redundant second fetch when the app starts in SCANNING state.
+  // Prevents the driverState effect from re-running the initial fetch on first SCANNING transition
   const initialFetchDone = useRef(false);
 
   const fetchWeeklyEarnings = useCallback(async () => {
@@ -66,7 +65,6 @@ export default function HomeScreen() {
         .gte(TRIP_COLS.createdAt, monday)
         .not(TRIP_COLS.fare, 'is', null);
 
-      // Single pass: accumulate bars, totals, and today's stats
       const bars = [0, 0, 0, 0, 0, 0, 0];
       const tripsByDay = [0, 0, 0, 0, 0, 0, 0];
       let earned = 0;
@@ -97,14 +95,12 @@ export default function HomeScreen() {
     fetchWeeklyEarnings();
   }, [fetchWeeklyEarnings]);
 
-  // Re-fetch only on OFFLINE → SCANNING transition, not on initial mount
   useEffect(() => {
     if (initialFetchDone.current && driverState === DRIVER_STATE.SCANNING) {
       fetchWeeklyEarnings();
     }
   }, [driverState, fetchWeeklyEarnings]);
 
-  // Real-time: refresh earnings whenever this driver's trips change
   useEffect(() => {
     let channel;
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -154,7 +150,6 @@ export default function HomeScreen() {
             loading={earningsLoading}
           />
         </FadeInView>
-        {/* Shift card — always at top */}
         <FadeInView delay={80} distance={16}>
           <ShiftCard
             online={isOnline}
@@ -164,7 +159,6 @@ export default function HomeScreen() {
           />
         </FadeInView>
 
-        {/* Online states */}
         {driverState === DRIVER_STATE.SCANNING && <FadeInView delay={160} distance={16}><ScanningRadar /></FadeInView>}
         {driverState === DRIVER_STATE.ACTIVE   && activeTrip && (
           <FadeInView delay={160} distance={16}>
@@ -178,7 +172,6 @@ export default function HomeScreen() {
           </FadeInView>
         )}
 
-        {/* Analytics — always visible regardless of shift status */}
         {showChart && <FadeInView delay={160} distance={16}>{earningsChart}</FadeInView>}
         {!isActive  && <FadeInView delay={240} distance={16}><QuickActions /></FadeInView>}
       </ScrollView>
@@ -191,7 +184,6 @@ export default function HomeScreen() {
         />
       )}
 
-      {/* Floating available trips button — opens the trip popup */}
       {isOnline && availableTrips.filter(t => !t.createdAt || (Date.now() - new Date(t.createdAt).getTime()) / 1000 < 84).length > 0 && !showTripSheet && driverState !== DRIVER_STATE.ACTIVE && (
         <Animated.View collapsable={false} style={[styles.floatWrap, { transform: [{ scale: pulseAnim }] }]}>
           <TouchableOpacity
@@ -203,9 +195,9 @@ export default function HomeScreen() {
               });
               if (validTrips.length === 0) return;
               if (validTrips.length === 1) {
-                openTripSheet(validTrips[0]); // single trip → show countdown popup so driver can review before accepting
+                openTripSheet(validTrips[0]);
               } else {
-                setShowAvailableSheet(true); // multiple trips → show list to browse and accept
+                setShowAvailableSheet(true);
               }
             }}
             activeOpacity={0.85}
@@ -225,7 +217,7 @@ export default function HomeScreen() {
 }
 
 const GreetingHeader = memo(function GreetingHeader({ name, earned, trips, rating, loading }) {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const { t, isRTL } = useLanguage();
   const hour     = new Date().getHours();
   const greeting = useMemo(
@@ -248,7 +240,6 @@ const GreetingHeader = memo(function GreetingHeader({ name, earned, trips, ratin
       <Text style={[greetingStyles.date, { color: colors.yellow }]}>{dateStr}</Text>
       <Text style={[greetingStyles.name, { color: colors.textPrimary }]}>{greeting}, {name} 👋</Text>
 
-      {/* Compact today's overview strip */}
       <View style={[greetingStyles.statsStrip, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         {stats.map((s, i) => (
           <React.Fragment key={s.label}>

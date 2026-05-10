@@ -24,9 +24,8 @@ export function AuthProvider({ children }) {
   const isDemoRef         = useRef(false);
   const profileChannelRef = useRef(null);
 
-  // ─── Auth state listener ─────────────────────────────────────────────────────
   useEffect(() => {
-    // Safety net — if loading takes more than 10s, force past it
+    // Force past the loading screen if auth init stalls beyond 10s
     const safetyTimer = setTimeout(() => {
       setIsLoading(prev => { if (prev) { console.warn('[Auth] Loading timeout — forcing past loading screen'); } return false; });
     }, 10000);
@@ -39,8 +38,7 @@ export function AuthProvider({ children }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (isDemoRef.current) return;
       if (session?.user) {
-        // Only re-fetch on explicit sign-in or token refresh — not INITIAL_SESSION
-        // (getSession() above already handles the initial load)
+        // INITIAL_SESSION already handled by getSession() above — only react to explicit sign-in/refresh
         if (_event === 'SIGNED_IN' || _event === 'TOKEN_REFRESHED') {
           fetchDriverProfile(session.user.id);
         }
@@ -60,7 +58,6 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  // ─── Helpers ─────────────────────────────────────────────────────────────────
   function unsubscribeProfile() {
     if (profileChannelRef.current) {
       supabase.removeChannel(profileChannelRef.current);
@@ -84,7 +81,6 @@ export function AuthProvider({ children }) {
     });
   }
 
-  // ─── Fetch driver profile ─────────────────────────────────────────────────────
   async function fetchDriverProfile(authUserId) {
     try {
       const { data, error } = await supabase
@@ -101,7 +97,7 @@ export function AuthProvider({ children }) {
       if (error) throw error;
       applyDriverRow(data);
 
-      // Register push token on every app open — token can change, always overwrite
+      // Push tokens can rotate — overwrite on every app open
       registerForPushNotificationsAsync().then(token => {
         if (token) {
           supabase.from(TABLE_DRIVERS)
@@ -111,7 +107,6 @@ export function AuthProvider({ children }) {
         }
       }).catch(() => {});
 
-      // Real-time: keep driver profile in sync (rating, totalTrips updated by dispatcher)
       unsubscribeProfile();
       profileChannelRef.current = supabase
         .channel(`driver-profile-${authUserId}`)
@@ -130,7 +125,6 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // ─── Real login ──────────────────────────────────────────────────────────────
   async function login(phone, pin) {
     const normalised = phone.replace(/[\s\-\(\)]/g, '');
     const e164       = normalised.startsWith('+') ? normalised : `+961${normalised}`;
@@ -139,7 +133,6 @@ export function AuthProvider({ children }) {
     if (error) throw new Error(error.message);
   }
 
-  // ─── Demo login ──────────────────────────────────────────────────────────────
   function demoLogin() {
     isDemoRef.current = true;
     setIsLoading(false);
@@ -147,7 +140,6 @@ export function AuthProvider({ children }) {
     setIsAuthenticated(true);
   }
 
-  // ─── Logout ──────────────────────────────────────────────────────────────────
   async function logout() {
     isDemoRef.current = false;
     unsubscribeProfile();
@@ -156,7 +148,6 @@ export function AuthProvider({ children }) {
     setIsAuthenticated(false);
   }
 
-  // ─── Save push token ─────────────────────────────────────────────────────────
   async function savePushToken(token) {
     if (!driver.id || isDemoRef.current) return;
     await supabase

@@ -23,7 +23,6 @@ const FILTERS = [
   { id: 'cancelled', labelKey: 'filterCancelled'   },
 ];
 
-// Uses accentKey so colours resolve from the theme at render time
 const STATUS_CONFIG = {
   pending:   { labelKey: 'statusPending',   accentKey: 'yellow', icon: '⏳' },
   accepted:  { labelKey: 'statusAccepted',  accentKey: 'yellow', icon: '🚕' },
@@ -100,7 +99,7 @@ export default function TripsScreen() {
       });
       setTrips(mapped);
       setStats({ total: mapped.length, earned: totalEarned, completed: completedCount });
-    } catch { /* demo mode */ } finally {
+    } catch {} finally {
       setLoading(false); setRefreshing(false);
     }
   }, []);
@@ -136,12 +135,10 @@ export default function TripsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
-      {/* Same AppHeader as Home */}
       <SafeAreaView edges={['top']} style={{ backgroundColor: colors.appBar }}>
         <AppHeader online={isOnline} />
       </SafeAreaView>
 
-      {/* Page title + stats */}
       <View style={styles.pageHeader}>
         <Text style={[styles.pageTitle, { color: colors.textPrimary }]}>{t('tripHistory')}</Text>
         <View style={[styles.statsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
@@ -161,7 +158,6 @@ export default function TripsScreen() {
         </View>
       </View>
 
-      {/* Filter pills */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -197,7 +193,6 @@ export default function TripsScreen() {
         onClose={() => setSelectedTrip(null)}
       />
 
-      {/* List */}
       {loading ? (
         <ScrollView contentContainerStyle={styles.listContent}>
           {[0,1,2,3,4].map(i => <SkeletonTripCard key={i} />)}
@@ -249,7 +244,6 @@ const TripRow = memo(function TripRow({ trip, index = 0, onPress }) {
         <View style={[styles.cardAccent, { backgroundColor: color }]} />
         <View style={styles.cardBody}>
 
-          {/* Top row: name + status + fare */}
           <View style={styles.cardTop}>
             <View style={styles.cardTopLeft}>
               <Text style={[styles.cardName, { color: colors.textPrimary }]}>{trip.name}</Text>
@@ -263,7 +257,6 @@ const TripRow = memo(function TripRow({ trip, index = 0, onPress }) {
             </View>
           </View>
 
-          {/* Route */}
           <View style={[styles.routeBlock, { borderTopColor: colors.border }]}>
             <View style={styles.routeRow}>
               <View style={[styles.dotG, { backgroundColor: colors.green }]} />
@@ -276,7 +269,6 @@ const TripRow = memo(function TripRow({ trip, index = 0, onPress }) {
             </View>
           </View>
 
-          {/* Footer: distance + payment */}
           {(!!trip.dist || !!trip.paymentMethod) && (
             <View style={[styles.cardFooter, { borderTopColor: colors.border }]}>
               {!!trip.dist && (

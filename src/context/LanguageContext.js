@@ -11,7 +11,6 @@ export function LanguageProvider({ children }) {
   const [language, setLanguageState] = useState('en');
   const isRTL = language === 'ar';
 
-  // Load persisted language on mount
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY).then(lang => {
       if (lang && lang !== language) {

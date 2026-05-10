@@ -185,17 +185,14 @@ export default function AccountScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchEarnings(); }} tintColor={colors.yellow} colors={[colors.yellow]} />
         }
       >
-        {/* ── Profile card ──────────────────────────────── */}
         <View style={styles.profileWrap}>
           <View style={[styles.profileCard, { backgroundColor: colors.bgCard, borderColor: colors.border }, !isDark && styles.shadow]}>
-            {/* Subtle yellow glow at top */}
             <LinearGradient
               colors={[`${colors.yellow}18`, 'transparent']}
               style={styles.profileGlow}
               pointerEvents="none"
             />
 
-            {/* Avatar + info row */}
             <View style={styles.profileRow}>
               <TouchableOpacity onPress={handlePhotoUpload} activeOpacity={0.8} style={styles.avatarWrap}>
                 {driver.photoUrl ? (
@@ -225,10 +222,8 @@ export default function AccountScreen() {
               </View>
             </View>
 
-            {/* Divider */}
             <View style={[styles.profileDivider, { backgroundColor: colors.border }]} />
 
-            {/* Stats pills */}
             <View style={styles.statsRow}>
               <StatPill icon="⭐" label={t('rating')}                             value={Number(driver.rating).toFixed(1)} color={colors.yellow} />
               <StatPill icon="🚕" label={t('totalTrips')}                          value={String(driver.totalTrips)}        color={colors.green}  />
@@ -238,7 +233,6 @@ export default function AccountScreen() {
         </View>
 
         <View style={styles.body}>
-          {/* ── Earnings ─────────────────────────────────── */}
           <Text style={[styles.section, { color: colors.textMuted }]}>{t('earningsSection')}</Text>
           {loading ? <SkeletonEarningsRow /> : (
             <View style={[styles.card, { backgroundColor: colors.bgCard, borderColor: colors.border }, !isDark && styles.shadow]}>
@@ -260,7 +254,6 @@ export default function AccountScreen() {
             </View>
           )}
 
-          {/* ── Driver details ───────────────────────────── */}
           <Text style={[styles.section, { color: colors.textMuted }]}>{t('driverDetails')}</Text>
           <View style={[styles.card, { backgroundColor: colors.bgCard, borderColor: colors.border }, !isDark && styles.shadow]}>
             <InfoRow label={t('phone')}       value={driver.phone}   />
@@ -270,7 +263,6 @@ export default function AccountScreen() {
             <InfoRow label={t('totalTrips')}  value={String(driver.totalTrips)} last />
           </View>
 
-          {/* ── Preferences ──────────────────────────────── */}
           <Text style={[styles.section, { color: colors.textMuted }]}>{t('preferences')}</Text>
           <View style={[styles.card, { backgroundColor: colors.bgCard, borderColor: colors.border }, !isDark && styles.shadow]}>
             <View style={[styles.settingRow, { borderBottomColor: colors.border }]}>
@@ -318,7 +310,6 @@ export default function AccountScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* ── Support ──────────────────────────────────── */}
           <Text style={[styles.section, { color: colors.textMuted }]}>{t('support')}</Text>
           <View style={[styles.card, { backgroundColor: colors.bgCard, borderColor: colors.border }, !isDark && styles.shadow]}>
             <TouchableOpacity style={[styles.settingRow, { borderBottomColor: colors.border }]} activeOpacity={0.75}
@@ -350,7 +341,6 @@ export default function AccountScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* ── Legal & About ─────────────────────────────── */}
           <Text style={[styles.section, { color: colors.textMuted }]}>{t('about')}</Text>
           <View style={[styles.card, { backgroundColor: colors.bgCard, borderColor: colors.border }, !isDark && styles.shadow]}>
             <TouchableOpacity style={[styles.settingRow, { borderBottomColor: colors.border }]} activeOpacity={0.75}
@@ -386,7 +376,6 @@ export default function AccountScreen() {
             </View>
           )}
 
-          {/* ── Logout ───────────────────────────────────── */}
           <TouchableOpacity
             onPress={handleLogout}
             activeOpacity={0.85}

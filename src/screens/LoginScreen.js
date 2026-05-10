@@ -10,11 +10,10 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 import { FONTS, RADIUS } from '../theme';
-import GlassView from '../components/GlassView';
 
 export default function LoginScreen() {
-  const { login, demoLogin } = useAuth();
-  const { colors, isDark }   = useTheme();
+  const { login }            = useAuth();
+  const { colors }           = useTheme();
   const { t, isRTL }         = useLanguage();
   const [phone, setPhone]    = useState('');
   const [pin, setPin]        = useState('');
@@ -89,7 +88,6 @@ export default function LoginScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Logo */}
         <Animated.View style={{ alignItems: 'center', opacity: logoOpacity, transform: [{ scale: logoScale }] }}>
           <Image
             source={require('../../assets/allway-main-logo.jpg')}
@@ -97,7 +95,6 @@ export default function LoginScreen() {
             resizeMode="cover"
           />
 
-          {/* Driver Portal badge */}
           <View style={[styles.portalRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <View style={[styles.portalLine, { backgroundColor: colors.yellow }]} />
             <View style={[styles.portalBadge, { backgroundColor: colors.yellowFaint, borderColor: `${colors.yellow}35` }]}>
@@ -107,7 +104,6 @@ export default function LoginScreen() {
           </View>
         </Animated.View>
 
-        {/* Card */}
         <Animated.View style={[styles.cardWrap, { opacity: formOpacity, transform: [{ translateX: shakeAnim }, { translateY: formSlide }] }]}>
           <View style={[styles.card, { backgroundColor: colors.bgCard, borderColor: colors.border }]}>
 
@@ -171,7 +167,6 @@ export default function LoginScreen() {
 
       </ScrollView>
 
-      {/* ── Login success overlay ── */}
       {success && (
         <Animated.View
           style={[
@@ -204,37 +199,27 @@ const styles = StyleSheet.create({
   // Logo
   logo: { width: 300, height: 150, borderRadius: 36 },
 
-  // Driver Portal badge
   portalRow:   { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20, marginBottom: 36 },
   portalLine:  { flex: 1, height: 1, opacity: 0.5 },
   portalBadge: { flexDirection: 'row', alignItems: 'center', paddingVertical: 7, paddingHorizontal: 14, borderRadius: RADIUS.full, borderWidth: 1 },
   portalText:  { fontSize: 12, fontFamily: FONTS.extraBold, letterSpacing: 1.6 },
 
-  // Card
   cardWrap: { width: '100%' },
   card:     { width: '100%', borderWidth: 1, borderRadius: RADIUS.xxxl, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 16, elevation: 3 },
 
-  // Inputs
   label:    { fontSize: 10, fontFamily: FONTS.extraBold, letterSpacing: 0.8, marginBottom: 8 },
   inputRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: RADIUS.md, paddingLeft: 12, paddingRight: 8, height: 52 },
   inputIcon:{ fontSize: 15, marginRight: 6, lineHeight: 22 },
   input:    { flex: 1, fontFamily: FONTS.bold, fontSize: 15, padding: 0, margin: 0, letterSpacing: 0 },
   pinInput: { letterSpacing: 6, fontSize: 18 },
 
-  // Error
   errorBox:  { marginTop: 14, padding: 12, borderWidth: 1, borderRadius: RADIUS.md },
   errorText: { fontSize: 12, fontFamily: FONTS.bold },
 
-  // Button
   btnWrap: { marginTop: 20, borderRadius: RADIUS.lg, overflow: 'hidden' },
   btn:     { paddingVertical: 17, alignItems: 'center', justifyContent: 'center' },
   btnText: { fontSize: 15, fontFamily: FONTS.black, color: '#000', letterSpacing: 0.3 },
 
-  // Demo
-  demoBtn:     { marginTop: 20, paddingVertical: 13, paddingHorizontal: 32, borderRadius: RADIUS.full, borderWidth: 1 },
-  demoBtnText: { fontSize: 13, fontFamily: FONTS.extraBold, letterSpacing: 0.3 },
-
-  // Success overlay
   overlay:      { alignItems: 'center', justifyContent: 'center' },
   overlayInner: { alignItems: 'center', paddingHorizontal: 40 },
   overlayLogo:  { width: 240, height: 120, borderRadius: 28 },

@@ -8,7 +8,6 @@ import { supabase } from '../utils/supabase';
 import { startLocationTracking, stopLocationTracking, LOCATION_TASK_NAME } from '../utils/locationTask';
 import { TABLE_SHIFTS, TABLE_LOCATIONS, TABLE_TRIPS, TABLE_DRIVERS, TRIP_COLS, DRIVER_COLS } from '../config';
 import { useAuth } from './AuthContext';
-import { sendTripNotification } from '../utils/notifications';
 import { formatTime } from '../utils/dateUtils';
 
 // In Expo Go, background location tasks crash — use foreground-only tracking
@@ -23,9 +22,6 @@ export const DRIVER_STATE = {
   TRIPS:    'trips',
   ACTIVE:   'active',
 };
-
-// Max radius (km) within which a driver receives a trip request
-const MAX_DISPATCH_RANGE_KM = 10;
 
 const DriverContext = createContext(null);
 
@@ -62,7 +58,6 @@ export const DEMO_AVAILABLE_TRIPS = [
   },
 ];
 
-// Haversine distance between two lat/lng points in kilometres
 function haversineKm(lat1, lon1, lat2, lon2) {
   const R    = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -108,10 +103,9 @@ function markPreferred(trips, userId) {
   return trips.map(t => ({ ...t, isPreferred: t.preferredDriverId === userId }));
 }
 
-// ─── Foreground location watcher (Expo Go fallback) ───────────────────────────
-// Uses watchPositionAsync so the OS delivers locations on a reliable 2s cadence.
-// This avoids the blocking delay of getCurrentPositionAsync + setInterval, which
-// caused effective send rates of 3-4s in practice.
+// Foreground GPS watcher — used as the primary stream and as the Expo Go fallback.
+// watchPositionAsync delivers on a reliable 2s cadence; getCurrentPositionAsync + setInterval
+// previously stretched effective send rates to 3-4s.
 let locationSubscription = null;
 
 async function startForegroundTracking(cachedUserId) {
@@ -121,7 +115,8 @@ async function startForegroundTracking(cachedUserId) {
 
   locationSubscription = await Location.watchPositionAsync(
     {
-      accuracy:         Location.Accuracy.Balanced, // Balanced fires more reliably when stationary vs High
+      // Balanced fires more reliably when stationary than High
+      accuracy:         Location.Accuracy.Balanced,
       timeInterval:     2000,
       distanceInterval: 0,
     },
@@ -165,7 +160,7 @@ async function stopForegroundTracking() {
         { driver_id: user.id, is_online: false, updated_at: now },
         { onConflict: 'driver_id' }
       );
-      // Mark offline in drivers table so CRM map removes the marker
+      // Mark offline in drivers table so the CRM map removes the marker
       await supabase.from(TABLE_DRIVERS)
         .update({ online: false, last_seen: now, [DRIVER_COLS.status]: 'offline' })
         .eq(DRIVER_COLS.id, user.id);
@@ -193,9 +188,8 @@ export function DriverProvider({ children }) {
   const carTypeRef      = useRef('comfort');
   const isDemoRef       = useRef(false);
   const userIdRef       = useRef(null);
-  const pickupTimeRef   = useRef(null); // set when driver taps "Picked Up"
+  const pickupTimeRef   = useRef(null);
 
-  // ─── Shift timer ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (driverState === DRIVER_STATE.OFFLINE) {
       clearInterval(timerRef.current);
@@ -203,8 +197,8 @@ export function DriverProvider({ children }) {
       startTimeRef.current = null;
       setShiftSeconds(0);
     } else {
-      // Always restart the interval on any non-offline state transition
-      // so the timer never gets stuck after completing or cancelling a trip
+      // Restart the interval on every non-offline transition so the timer
+      // never gets stuck after a completed/cancelled trip
       clearInterval(timerRef.current);
       if (!startTimeRef.current) startTimeRef.current = Date.now();
       timerRef.current = setInterval(() => {
@@ -221,51 +215,44 @@ export function DriverProvider({ children }) {
     };
   }, []);
 
-  // ─── Periodic cleanup: remove expired or claimed trips from availableTrips ─────
   useEffect(() => {
     if (driverState === DRIVER_STATE.OFFLINE) return;
 
     const cleanup = setInterval(async () => {
-      // Remove trips older than 84 seconds (countdown expired)
+      // Drop trips whose 84s countdown has expired
       setAvailableTrips(prev => prev.filter(t => {
         if (!t.createdAt) return true;
         const elapsed = (Date.now() - new Date(t.createdAt).getTime()) / 1000;
         return elapsed < 84;
       }));
 
-      // Also re-sync from DB to catch trips claimed by other drivers
+      // Re-sync to catch trips claimed by other drivers
       await syncPendingTrips();
     }, 8000);
 
     return () => clearInterval(cleanup);
   }, [driverState]);
 
-  // ─── Restore shift + active trip on app reopen ───────────────────────────────
   useEffect(() => {
     async function restoreShiftIfActive() {
       try {
-        // ── Step 1: Check for saved shift (requires GPS task to be running) ────────
         const saved = await AsyncStorage.getItem(SHIFT_STORAGE_KEY);
         if (!saved) return;
 
         const { userId, shiftId, startTime } = JSON.parse(saved);
         if (!userId) return;
 
-        // Verify GPS is still active (confirms driver is still on shift)
         const isTracking = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME).catch(() => false);
 
-        // Restore refs
         userIdRef.current       = userId;
         currentShiftRef.current = shiftId ?? null;
         isDemoRef.current       = false;
         startTimeRef.current    = startTime;
 
-        // ── Step 2: Restore active trip (independent of GPS check) ───────────────
         const savedTrip = await AsyncStorage.getItem(ACTIVE_TRIP_STORAGE_KEY);
         if (savedTrip) {
           const trip = JSON.parse(savedTrip);
 
-          // Verify trip is still active in DB
           const { data: tripRow } = await supabase
             .from(TABLE_TRIPS)
             .select('*')
@@ -284,21 +271,18 @@ export function DriverProvider({ children }) {
             await supabase.from(TABLE_DRIVERS)
               .update({ online: true, [DRIVER_COLS.status]: 'on_trip' })
               .eq(DRIVER_COLS.id, userId);
-            // Restart GPS if it stopped
             if (!isTracking) {
               try { await startForegroundTracking(userId); } catch {}
             }
             console.log('[DriverContext] Active trip restored:', trip.id, '— status:', tripStatus);
             return;
           } else {
-            // Trip ended while app was closed
             await AsyncStorage.removeItem(ACTIVE_TRIP_STORAGE_KEY);
           }
         }
 
-        // ── Step 3: No active trip — restore to scanning state ────────────────────
         if (!isTracking) {
-          // GPS stopped — clear shift as driver likely ended it externally
+          // GPS stopped externally — clear the saved shift so we don't restore stale state
           await AsyncStorage.removeItem(SHIFT_STORAGE_KEY);
           return;
         }
@@ -325,7 +309,6 @@ export function DriverProvider({ children }) {
     restoreShiftIfActive();
   }, []);
 
-  // ─── Notification tap handler ─────────────────────────────────────────────────
   async function handleNotificationTap(tripId) {
     try {
       const { data } = await supabase
@@ -343,17 +326,16 @@ export function DriverProvider({ children }) {
   }
 
   useEffect(() => {
-    // Foreground / background tap
     const sub = Notifications.addNotificationResponseReceivedListener(response => {
       const tripId = response.notification.request.content.data?.tripId;
       if (tripId) handleNotificationTap(tripId);
     });
 
-    // App launched from fully closed via notification tap
+    // Notification tap that launched the app from a fully closed state
     Notifications.getLastNotificationResponseAsync().then(response => {
       const tripId = response?.notification.request.content.data?.tripId;
       if (tripId) {
-        // Delay to let shift restore complete first
+        // Wait for shift restore to complete first
         setTimeout(() => handleNotificationTap(tripId), 1500);
       }
     });
@@ -361,10 +343,6 @@ export function DriverProvider({ children }) {
     return () => sub.remove();
   }, []);
 
-  // ─── Realtime: subscribe to ALL new pending trips ─────────────────────────────
-  // Uber-style: every online driver receives new trip requests.
-  // The haversine check filters out trips that are too far away.
-  // Re-syncs availableTrips with what's actually pending in the DB
   async function syncPendingTrips() {
     try {
       const { data } = await supabase
@@ -393,7 +371,7 @@ export function DriverProvider({ children }) {
           table:  TABLE_TRIPS,
         },
         async (payload) => {
-          // DELETE: re-sync from DB — more reliable than relying on payload.old
+          // DELETE: payload.old is unreliable; re-sync from DB
           if (payload.eventType === 'DELETE') {
             await syncPendingTrips();
             return;
@@ -405,7 +383,7 @@ export function DriverProvider({ children }) {
           const status   = row[TRIP_COLS.status];
           const driverId = row[TRIP_COLS.driverId];
 
-          // UPDATE: trip status changed — re-sync to get accurate list
+          // UPDATE: status changed — re-sync to get the accurate list
           if (payload.eventType === 'UPDATE') {
             if (status !== 'pending') {
               await syncPendingTrips();
@@ -413,30 +391,28 @@ export function DriverProvider({ children }) {
             return;
           }
 
-          // INSERT: only react to new unclaimed pending trips matching driver's car type
+          // INSERT: only react to new unclaimed pending trips matching the driver's car type
           if (status !== 'pending' || driverId) return;
           if (row[TRIP_COLS.rideType] && row[TRIP_COLS.rideType] !== carTypeRef.current) return;
 
           const trip = normalizeTrip(row);
 
           // TODO: re-enable range filter before production
-          // if (trip.pickupLat && trip.pickupLng) { ... }
 
           const markedTrip = markPreferred([trip], userIdRef.current)[0];
           setAvailableTrips(prev =>
             prev.find(t => t.id === markedTrip.id) ? prev : [markedTrip, ...prev]
           );
-          openTripSheet(trip, true); // realtime → play in-app sound only (push notification handles external alert)
+          // Realtime path → play the in-app sound (push notification handles the external alert)
+          openTripSheet(trip, true);
         }
       )
       .subscribe((status) => console.log('[Realtime] dispatch channel:', status));
   }
 
-  // ─── Go online ────────────────────────────────────────────────────────────────
   async function goOnline() {
     setDriverState(DRIVER_STATE.SCANNING);
 
-    // Get auth user first — needed for GPS caching and subscriptions
     let user = null;
     try {
       const result = await supabase.auth.getUser();
@@ -458,38 +434,32 @@ export function DriverProvider({ children }) {
       return;
     }
 
-    // Cache user ID and car type for trip filtering
     userIdRef.current = user.id;
     carTypeRef.current = driver?.carType ?? 'comfort';
 
-    // Always start foreground watcher — ensures reliable 2s logs and Supabase writes
-    // In dev builds the background task process doesn't stream logs to Metro consistently
-    // In production the background task handles screen-off tracking on top of this
+    // Foreground watcher is the source of truth for the 2s log/upsert cadence.
+    // The background task (native builds only) layers on top to keep GPS alive when the screen is off.
     try {
       await startForegroundTracking(user.id);
     } catch (e) {
       console.warn('[DriverContext] Foreground GPS failed:', e.message);
     }
 
-    // Additionally start background task on native builds (keeps GPS alive when screen off)
     if (!IS_EXPO_GO) {
       startLocationTracking().catch(e =>
         console.warn('[DriverContext] Background task failed (non-fatal):', e.message)
       );
     }
 
-    // Real mode — subscribe first, then log shift
     isDemoRef.current = false;
     subscribeToTrips(user.id);
 
-    // Mark driver online in CRM
     try {
       await supabase.from(TABLE_DRIVERS)
         .update({ online: true, [DRIVER_COLS.status]: 'available' })
         .eq(DRIVER_COLS.id, user.id);
     } catch (e) { console.warn('[DriverContext] online mark error:', e.message); }
 
-    // Fetch any trips already pending before we came online — filtered by driver's car type
     try {
       const { data } = await supabase
         .from(TABLE_TRIPS)
@@ -511,7 +481,7 @@ export function DriverProvider({ children }) {
       console.warn('[DriverContext] Shift log error:', e.message);
     }
 
-    // Persist shift state so it can be restored if the app is fully closed
+    // Persist shift so it can be restored if the app is fully closed
     try {
       await AsyncStorage.setItem(SHIFT_STORAGE_KEY, JSON.stringify({
         userId:    user.id,
@@ -522,7 +492,6 @@ export function DriverProvider({ children }) {
 
   }
 
-  // ─── Go offline ───────────────────────────────────────────────────────────────
   async function goOffline() {
     clearTimeout(scanTimeoutRef.current);
     setDriverState(DRIVER_STATE.OFFLINE);
@@ -551,14 +520,13 @@ export function DriverProvider({ children }) {
       }
     } catch (e) { console.warn('[DriverContext] Shift end error:', e.message); }
 
-    // Clear all persisted state so restore doesn't fire on next app open
+    // Clear persisted state so restore doesn't fire on next app open
     try {
       await AsyncStorage.removeItem(SHIFT_STORAGE_KEY);
       await AsyncStorage.removeItem(ACTIVE_TRIP_STORAGE_KEY);
     } catch {}
   }
 
-  // ─── Accept trip (atomic claim — first driver wins) ───────────────────────────
   async function acceptTrip(trip) {
     const resolved = trip || DEMO_TRIP;
 
@@ -567,7 +535,7 @@ export function DriverProvider({ children }) {
         const userId = userIdRef.current;
         if (!userId) return;
 
-        // Atomic: only succeeds if trip is still unclaimed (status = 'pending')
+        // Atomic claim — only succeeds if the trip is still unclaimed (status = 'pending')
         const { data } = await supabase
           .from(TABLE_TRIPS)
           .update({
@@ -599,14 +567,13 @@ export function DriverProvider({ children }) {
     setPendingTrip(null);
     setAvailableTrips(prev => prev.filter(t => t.id !== resolved.id));
 
-    // Persist active trip so it survives app being fully closed
-    // Include acceptedAt so the trip timer can resume from the correct time
+    // Persist active trip so it survives the app being fully closed.
+    // acceptedAt lets the trip timer resume from the correct time.
     try {
       const tripToSave = { ...resolved, acceptedAt: new Date().toISOString() };
       await AsyncStorage.setItem(ACTIVE_TRIP_STORAGE_KEY, JSON.stringify(tripToSave));
     } catch (e) { console.warn('[DriverContext] Save active trip error:', e.message); }
 
-    // Update CRM status to on_trip
     const uid = userIdRef.current;
     if (!isDemoRef.current && uid) {
       try {
@@ -615,7 +582,6 @@ export function DriverProvider({ children }) {
     }
   }
 
-  // ─── Passenger picked up (en route to drop-off) ──────────────────────────────
   async function pickUpPassenger() {
     const tripId  = activeTripIdRef.current;
     const now     = new Date().toISOString();
@@ -635,7 +601,6 @@ export function DriverProvider({ children }) {
     }
   }
 
-  // ─── No show — customer didn't appear ────────────────────────────────────────
   async function markNoShow() {
     const tripId = activeTripIdRef.current;
     activeTripIdRef.current = null;
@@ -643,11 +608,10 @@ export function DriverProvider({ children }) {
     setDriverState(DRIVER_STATE.SCANNING);
     try { await AsyncStorage.removeItem(ACTIVE_TRIP_STORAGE_KEY); } catch {}
     if (!isDemoRef.current && tripId) {
-      // Trip update has no user dependency — do it first so it always succeeds
+      // Run the trip update first — it has no user dependency and must always succeed
       try {
         await supabase.from(TABLE_TRIPS).update({ [TRIP_COLS.status]: 'no_show' }).eq(TRIP_COLS.id, tripId);
       } catch (e) { console.warn('[DriverContext] markNoShow trip error:', e.message); }
-      // Driver status update uses cached ID
       const uid = userIdRef.current;
       if (uid) {
         try {
@@ -657,7 +621,6 @@ export function DriverProvider({ children }) {
     }
   }
 
-  // ─── Cancel trip (rare — emergency or dispatcher-triggered) ──────────────────
   async function cancelTrip(reason = '') {
     const tripId = activeTripIdRef.current;
     activeTripIdRef.current = null;
@@ -679,10 +642,9 @@ export function DriverProvider({ children }) {
     }
   }
 
-  // ─── Complete trip ────────────────────────────────────────────────────────────
   async function completeTrip(paymentMethod = 'cash', customerRating = null) {
     const tripId  = activeTripIdRef.current;
-    const tripSnap = activeTrip; // snapshot before clearing
+    const tripSnap = activeTrip;
     activeTripIdRef.current = null;
     setActiveTrip(null);
     setDriverState(DRIVER_STATE.SCANNING);
@@ -695,20 +657,18 @@ export function DriverProvider({ children }) {
         setDriverState(prev => prev === DRIVER_STATE.SCANNING ? DRIVER_STATE.TRIPS : prev);
       }, 3000);
     } else if (tripId) {
-      // Normalize split payment — CRM expects 'split' not the full detail string
+      // CRM expects 'split' rather than the full detail string
       const normalizedMethod = paymentMethod.startsWith('split|') ? 'split' : paymentMethod;
 
-      // Calculate duration_min from pickupTimeRef
       const durationMin = pickupTimeRef.current
         ? Math.round((Date.now() - pickupTimeRef.current) / 60000)
         : null;
       pickupTimeRef.current = null;
 
-      // Calculate distance_km using Haversine if coords available
       let distanceKm = null;
       if (tripSnap?.pickupLat && tripSnap?.pickupLng && tripSnap?.dropoffLat && tripSnap?.dropoffLng) {
         distanceKm = haversineKm(tripSnap.pickupLat, tripSnap.pickupLng, tripSnap.dropoffLat, tripSnap.dropoffLng);
-        distanceKm = Math.round(distanceKm * 10) / 10; // 1 decimal
+        distanceKm = Math.round(distanceKm * 10) / 10;
       }
 
       try {
@@ -729,7 +689,6 @@ export function DriverProvider({ children }) {
           await supabase.from(TABLE_TRIPS).update({ [TRIP_COLS.status]: 'completed' }).eq(TRIP_COLS.id, tripId);
         } catch (e2) { console.warn('[DriverContext] completeTrip fallback error:', e2.message); }
       }
-      // Restore CRM status to available
       const uid = userIdRef.current;
       if (uid) {
         try {
@@ -739,7 +698,7 @@ export function DriverProvider({ children }) {
     }
   }
 
-  // withSound = true only for realtime-triggered popups, false when driver taps button manually
+  // withSound = true only for realtime-triggered popups; false when the driver taps the button manually
   function openTripSheet(trip, withSound = false) {
     setTripSoundEnabled(withSound);
     setPendingTrip(trip || DEMO_TRIP);

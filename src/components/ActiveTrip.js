@@ -19,7 +19,6 @@ function formatPaymentLabel(method) {
   return LABELS[method] ?? method;
 }
 
-// ─── Success overlay ──────────────────────────────────────────────────────────
 function TripSuccessOverlay({ visible, trip, paymentMethod, onDone }) {
   const { colors } = useTheme();
   const { t }      = useLanguage();
@@ -56,7 +55,6 @@ function TripSuccessOverlay({ visible, trip, paymentMethod, onDone }) {
           opacity: opacityAnim,
         }]}>
 
-          {/* Animated check icon */}
           <Animated.View style={[
             successStyles.iconWrap,
             { backgroundColor: 'rgba(93,202,165,0.15)', borderColor: 'rgba(93,202,165,0.35)', transform: [{ scale: checkAnim }] },
@@ -64,15 +62,12 @@ function TripSuccessOverlay({ visible, trip, paymentMethod, onDone }) {
             <Text style={successStyles.icon}>✓</Text>
           </Animated.View>
 
-          {/* Title */}
           <Text style={[successStyles.title, { color: colors.textPrimary }]}>{t('tripCompleted')}</Text>
 
-          {/* Customer name */}
           <Text style={[successStyles.customer, { color: colors.textMuted }]}>
             {trip?.customerFull || trip?.customer}
           </Text>
 
-          {/* Fare + payment method */}
           <View style={[successStyles.fareBox, { backgroundColor: `${colors.green}12`, borderColor: `${colors.green}30` }]}>
             <Text style={[successStyles.fare, { color: colors.green }]}>{trip?.fare}</Text>
             <View style={[successStyles.paymentChip, { backgroundColor: colors.bgCard, borderColor: colors.border }]}>
@@ -82,12 +77,10 @@ function TripSuccessOverlay({ visible, trip, paymentMethod, onDone }) {
             </View>
           </View>
 
-          {/* Receipt note */}
           <Text style={[successStyles.sub, { color: colors.textDisabled }]}>
             {t('receiptRecorded')}
           </Text>
 
-          {/* Manual dismiss button */}
           <TouchableOpacity
             onPress={handleDone}
             activeOpacity={0.85}
@@ -102,7 +95,6 @@ function TripSuccessOverlay({ visible, trip, paymentMethod, onDone }) {
   );
 }
 
-// ─── Customer rating modal ────────────────────────────────────────────────────
 function CustomerRatingModal({ visible, trip, onRate }) {
   const { colors } = useTheme();
   const [selected, setSelected] = useState(0);
@@ -125,7 +117,6 @@ function CustomerRatingModal({ visible, trip, onRate }) {
           <Text style={[ratingStyles.title, { color: colors.textPrimary }]}>Rate this customer</Text>
           <Text style={[ratingStyles.sub, { color: colors.textMuted }]}>{trip?.customerFull || trip?.customer}</Text>
 
-          {/* Stars */}
           <View style={ratingStyles.stars}>
             {[1,2,3,4,5].map(star => (
               <TouchableOpacity key={star} onPress={() => setSelected(star)} activeOpacity={0.7}>
@@ -149,6 +140,8 @@ function CustomerRatingModal({ visible, trip, onRate }) {
   );
 }
 
+
+
 const ratingStyles = StyleSheet.create({
   overlay: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
   card:    { width: '100%', borderRadius: RADIUS.xxxl, padding: 32, alignItems: 'center', gap: 14 },
@@ -160,7 +153,6 @@ const ratingStyles = StyleSheet.create({
   btnText: { fontSize: 16, fontFamily: FONTS.black },
 });
 
-// ─── Main component ───────────────────────────────────────────────────────────
 export default function ActiveTrip({ trip, onComplete, onPickUp, onNoShow, onCancel }) {
   const { colors } = useTheme();
   const { t, isRTL } = useLanguage();
@@ -169,11 +161,10 @@ export default function ActiveTrip({ trip, onComplete, onPickUp, onNoShow, onCan
   const [showRating,  setShowRating]  = useState(false);
   const [paidMethod,  setPaidMethod]  = useState(null);
   const [elapsed,     setElapsed]     = useState(0);
-  // Use acceptedAt from trip if available (restored from AsyncStorage)
+  // Initialise from acceptedAt (restored from AsyncStorage) so the timer survives app restarts
   const startRef = useRef(trip?.acceptedAt ? new Date(trip.acceptedAt).getTime() : Date.now());
   const timerRef = useRef(null);
 
-  // Live trip timer — initialises from acceptedAt so it survives app restarts
   useEffect(() => {
     setElapsed(Math.floor((Date.now() - startRef.current) / 1000));
     timerRef.current = setInterval(() => {
@@ -249,19 +240,18 @@ export default function ActiveTrip({ trip, onComplete, onPickUp, onNoShow, onCan
 
   function handleSuccessDone() {
     setShowSuccess(false);
-    setShowRating(true); // show rating before completing
+    setShowRating(true);
   }
 
   function handleRatingDone(stars) {
     setShowRating(false);
-    onComplete(paidMethod, stars); // pass rating to completeTrip
+    onComplete(paidMethod, stars);
   }
 
   return (
     <View style={styles.container}>
       <View style={[styles.card, { backgroundColor: `${colors.green}14`, borderColor: `${colors.green}40` }]}>
 
-        {/* Status badge + ride type + elapsed timer */}
         <View style={styles.badgeRow}>
           <View style={[styles.dot, { backgroundColor: colors.green }]} />
           <Text style={[styles.badgeText, { color: colors.green, flex: 1 }]}>
@@ -277,19 +267,16 @@ export default function ActiveTrip({ trip, onComplete, onPickUp, onNoShow, onCan
           </View>
         </View>
 
-        {/* Preferred driver banner */}
         {trip.isPreferred && (
           <View style={[styles.preferredBanner, { backgroundColor: `${colors.yellow}15`, borderColor: `${colors.yellow}40` }]}>
             <Text style={[styles.preferredText, { color: colors.yellow }]}>{t('preferredDriver')}</Text>
           </View>
         )}
 
-        {/* Customer */}
         <Text style={[styles.customerName, { color: colors.textPrimary }]}>
           {trip.customerFull || trip.customer}
         </Text>
 
-        {/* Phone */}
         {!!trip.phone && (
           <TouchableOpacity
             onPress={async () => { await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); callCustomer(); }}
@@ -300,7 +287,6 @@ export default function ActiveTrip({ trip, onComplete, onPickUp, onNoShow, onCan
           </TouchableOpacity>
         )}
 
-        {/* Route */}
         <View style={styles.routeBlock}>
           {[
             { label: t('pickup'),   text: trip.pickup,  dot: colors.green },
@@ -319,7 +305,6 @@ export default function ActiveTrip({ trip, onComplete, onPickUp, onNoShow, onCan
           ))}
         </View>
 
-        {/* Fare + distance */}
         <View style={[styles.metaRow, { borderTopColor: colors.border }]}>
           <View style={styles.metaItem}>
             <Text style={[styles.metaLabel, { color: colors.textMuted }]}>{t('fare')}</Text>
