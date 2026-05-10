@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useDriver, DRIVER_STATE } from '../context/DriverContext';
-import { FONTS } from '../theme';
+import { FONTS, RADIUS } from '../theme';
 import { getWeekBounds } from '../utils/dateUtils';
 import AppHeader from '../components/AppHeader';
 import FadeInView from '../components/FadeInView';
@@ -15,6 +15,8 @@ import QuickActions from '../components/QuickActions';
 import ScanningRadar from '../components/ScanningRadar';
 import ActiveTrip from '../components/ActiveTrip';
 import AvailableTripsSheet from '../components/AvailableTripsSheet';
+import ShiftSummaryModal from '../components/ShiftSummaryModal';
+import SosButton from '../components/SosButton';
 import { registerForPushNotificationsAsync } from '../utils/notifications';
 import { SkeletonChart } from '../components/Skeleton';
 import { supabase } from '../utils/supabase';
@@ -26,13 +28,26 @@ export default function HomeScreen() {
   const { driver, savePushToken } = useAuth();
   const {
     driverState, activeTrip, showTripSheet,
-    availableTrips, shiftTime, isOnline,
+    availableTrips, shiftTime, shiftSeconds, isOnline,
+    cashCollected, buildShiftSummary,
     goOnline, goOffline, acceptTrip, completeTrip,
     pickUpPassenger, markNoShow, cancelTrip, openTripSheet,
   } = useDriver();
 
-  const [showAvailableSheet, setShowAvailableSheet] = useState(false);
+  const [showAvailableSheet,  setShowAvailableSheet]  = useState(false);
+  const [showSummary,         setShowSummary]          = useState(false);
+  const [summaryData,         setSummaryData]          = useState(null);
+  const [summaryLoading,      setSummaryLoading]       = useState(false);
   const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  async function initiateEndShift() {
+    setSummaryData(null);
+    setSummaryLoading(true);
+    setShowSummary(true);
+    const data = await buildShiftSummary();
+    setSummaryData(data);
+    setSummaryLoading(false);
+  }
 
   useEffect(() => {
     if (availableTrips.length === 0) { pulseAnim.setValue(1); return; }
@@ -153,11 +168,27 @@ export default function HomeScreen() {
         <FadeInView delay={80} distance={16}>
           <ShiftCard
             online={isOnline}
-            onToggle={isOnline ? goOffline : goOnline}
+            onToggle={isOnline ? initiateEndShift : goOnline}
             shiftTime={isOnline ? shiftTime : '00:00:00'}
             disabled={driverState === DRIVER_STATE.ACTIVE}
           />
         </FadeInView>
+
+        {isOnline && cashCollected > 0 && (
+          <FadeInView delay={120} distance={10}>
+            <View style={[styles.cashCard, { backgroundColor: `${colors.yellow}10`, borderColor: `${colors.yellow}30` }]}>
+              <Text style={styles.cashIcon}>💵</Text>
+              <Text style={[styles.cashLabel, { color: colors.textMuted }]}>{t('cashOnHand')}</Text>
+              <Text style={[styles.cashAmount, { color: colors.yellow }]}>${cashCollected.toFixed(0)}</Text>
+            </View>
+          </FadeInView>
+        )}
+
+        {isOnline && (
+          <FadeInView delay={140} distance={10}>
+            <SosButton />
+          </FadeInView>
+        )}
 
         {driverState === DRIVER_STATE.SCANNING && <FadeInView delay={160} distance={16}><ScanningRadar /></FadeInView>}
         {driverState === DRIVER_STATE.ACTIVE   && activeTrip && (
@@ -175,6 +206,15 @@ export default function HomeScreen() {
         {showChart && <FadeInView delay={160} distance={16}>{earningsChart}</FadeInView>}
         {!isActive  && <FadeInView delay={240} distance={16}><QuickActions /></FadeInView>}
       </ScrollView>
+
+      <ShiftSummaryModal
+        visible={showSummary}
+        summary={summaryData}
+        loading={summaryLoading}
+        shiftSeconds={shiftSeconds ?? 0}
+        onConfirmEnd={(summary) => { setShowSummary(false); goOffline(summary); }}
+        onResume={() => { setShowSummary(false); setSummaryData(null); }}
+      />
 
       {showAvailableSheet && (
         <AvailableTripsSheet
@@ -270,6 +310,10 @@ const styles = StyleSheet.create({
   container:      { flex: 1 },
   scroll:         { flex: 1 },
   scrollContent:  { paddingBottom: Platform.OS === 'ios' ? 140 : 32 },
+  cashCard:   { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 18, marginTop: 12, borderWidth: 1, borderRadius: RADIUS.xl, paddingVertical: 14, paddingHorizontal: 18 },
+  cashIcon:   { fontSize: 20 },
+  cashLabel:  { flex: 1, fontSize: 13, fontFamily: FONTS.semiBold },
+  cashAmount: { fontSize: 22, fontFamily: FONTS.black },
   floatWrap:      { position: 'absolute', bottom: 12, alignSelf: 'center', left: 0, right: 0, alignItems: 'center', zIndex: 50 },
   floatBtn:       { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 26, paddingVertical: 13, paddingHorizontal: 20, shadowColor: '#F5B800', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.45, shadowRadius: 12, elevation: 8 },
   floatIcon:      { fontSize: 16 },

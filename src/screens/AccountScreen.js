@@ -19,6 +19,8 @@ import { supabase } from '../utils/supabase';
 import AppHeader from '../components/AppHeader';
 import { SkeletonEarningsRow } from '../components/Skeleton';
 import ReportIssueModal from '../components/ReportIssueModal';
+import ChangePinModal from '../components/ChangePinModal';
+import LegalModal from '../components/LegalModal';
 import { TABLE_TRIPS, TRIP_COLS } from '../config';
 
 function sumRows(rows, fareCol) {
@@ -69,8 +71,9 @@ export default function AccountScreen() {
   const [earnings, setEarnings]         = useState(null);
   const [loading, setLoading]           = useState(true);
   const [refreshing, setRefreshing]     = useState(false);
-  const [pinOpen, setPinOpen]           = useState(false);
-  const [showReport, setShowReport]     = useState(false);
+  const [showPinModal, setShowPinModal]     = useState(false);
+  const [showReport,   setShowReport]       = useState(false);
+  const [legalType,    setLegalType]        = useState(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const fetchEarnings = useCallback(async () => {
@@ -281,7 +284,7 @@ export default function AccountScreen() {
             </View>
             <TouchableOpacity
               style={[styles.settingRow, { borderBottomColor: colors.border }]}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPinOpen(v => !v); }}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowPinModal(true); }}
               activeOpacity={0.75}
             >
               <Text style={styles.settingIcon}>🔑</Text>
@@ -344,7 +347,7 @@ export default function AccountScreen() {
           <Text style={[styles.section, { color: colors.textMuted }]}>{t('about')}</Text>
           <View style={[styles.card, { backgroundColor: colors.bgCard, borderColor: colors.border }, !isDark && styles.shadow]}>
             <TouchableOpacity style={[styles.settingRow, { borderBottomColor: colors.border }]} activeOpacity={0.75}
-              onPress={() => Alert.alert('Terms of Service', 'Allway Taxi Driver Terms of Service.\nContact admin for full document.')}>
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setLegalType('terms'); }}>
               <Text style={styles.settingIcon}>📄</Text>
               <View style={styles.settingText}>
                 <Text style={[styles.settingTitle, { color: colors.textPrimary }]}>{t('termsOfService')}</Text>
@@ -352,7 +355,7 @@ export default function AccountScreen() {
               <Text style={[styles.chevron, { color: colors.textMuted }]}>›</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.settingRow, { borderBottomColor: colors.border }]} activeOpacity={0.75}
-              onPress={() => Alert.alert('Privacy Policy', 'Allway Taxi respects your privacy.\nContact admin for full document.')}>
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setLegalType('privacy'); }}>
               <Text style={styles.settingIcon}>🔒</Text>
               <View style={styles.settingText}>
                 <Text style={[styles.settingTitle, { color: colors.textPrimary }]}>{t('privacyPolicy')}</Text>
@@ -368,14 +371,6 @@ export default function AccountScreen() {
             </View>
           </View>
 
-          {pinOpen && (
-            <View style={[styles.pinNote, { backgroundColor: colors.yellowFaint, borderColor: `${colors.yellow}25` }]}>
-              <Text style={[styles.pinNoteText, { color: colors.textSecondary }]}>
-                To change your PIN, contact your dispatcher or Allway Taxi administration.
-              </Text>
-            </View>
-          )}
-
           <TouchableOpacity
             onPress={handleLogout}
             activeOpacity={0.85}
@@ -386,7 +381,9 @@ export default function AccountScreen() {
         </View>
       </ScrollView>
 
-      <ReportIssueModal visible={showReport} onClose={() => setShowReport(false)} />
+      <ReportIssueModal visible={showReport}           onClose={() => setShowReport(false)} />
+      <ChangePinModal   visible={showPinModal}          onClose={() => setShowPinModal(false)} />
+      <LegalModal       type={legalType ?? 'terms'}     visible={!!legalType} onClose={() => setLegalType(null)} />
     </View>
   );
 }
@@ -430,8 +427,6 @@ const styles = StyleSheet.create({
   settingSub:   { fontSize: 11, fontFamily: FONTS.semiBold, marginTop: 2 },
   chevron:      { fontSize: 22, lineHeight: 26 },
 
-  pinNote:      { borderRadius: RADIUS.lg, borderWidth: 1, padding: 14, marginBottom: 14, marginTop: -14 },
-  pinNoteText:  { fontSize: 13, fontFamily: FONTS.semiBold, lineHeight: 20 },
   logoutBtn:    { borderWidth: 1, borderRadius: RADIUS.xl, paddingVertical: 17, alignItems: 'center' },
   logoutText:   { fontSize: 14, fontFamily: FONTS.extraBold },
 });

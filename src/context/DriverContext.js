@@ -15,6 +15,7 @@ const IS_EXPO_GO = Constants.appOwnership === 'expo';
 
 const SHIFT_STORAGE_KEY       = 'allway_active_shift';
 const ACTIVE_TRIP_STORAGE_KEY = 'allway_active_trip';
+const CASH_STORAGE_KEY        = 'allway_shift_cash';
 
 export const DRIVER_STATE = {
   OFFLINE:  'offline',
@@ -162,7 +163,7 @@ async function stopForegroundTracking() {
       );
       // Mark offline in drivers table so the CRM map removes the marker
       await supabase.from(TABLE_DRIVERS)
-        .update({ online: false, last_seen: now, [DRIVER_COLS.status]: 'offline' })
+        .update({ [DRIVER_COLS.online]: false, last_seen: now, [DRIVER_COLS.status]: 'offline' })
         .eq(DRIVER_COLS.id, user.id);
     }
   } catch (e) { console.warn('[GPS] Offline mark error:', e.message); }
@@ -178,6 +179,7 @@ export function DriverProvider({ children }) {
   const [tripSoundEnabled, setTripSoundEnabled] = useState(false);
   const [shiftSeconds, setShiftSeconds]     = useState(0);
   const [availableTrips, setAvailableTrips] = useState([]);
+  const [cashCollected, setCashCollected]   = useState(0);
 
   const timerRef        = useRef(null);
   const startTimeRef    = useRef(null);
@@ -189,6 +191,7 @@ export function DriverProvider({ children }) {
   const isDemoRef       = useRef(false);
   const userIdRef       = useRef(null);
   const pickupTimeRef   = useRef(null);
+  const cashRef         = useRef(0);
 
   useEffect(() => {
     if (driverState === DRIVER_STATE.OFFLINE) {
@@ -242,6 +245,13 @@ export function DriverProvider({ children }) {
         const { userId, shiftId, startTime } = JSON.parse(saved);
         if (!userId) return;
 
+        const savedCash = await AsyncStorage.getItem(CASH_STORAGE_KEY);
+        if (savedCash) {
+          const c = parseFloat(savedCash) || 0;
+          cashRef.current = c;
+          setCashCollected(c);
+        }
+
         const isTracking = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME).catch(() => false);
 
         userIdRef.current       = userId;
@@ -269,7 +279,7 @@ export function DriverProvider({ children }) {
             setDriverState(DRIVER_STATE.ACTIVE);
             subscribeToTrips(userId);
             await supabase.from(TABLE_DRIVERS)
-              .update({ online: true, [DRIVER_COLS.status]: 'on_trip' })
+              .update({ [DRIVER_COLS.online]: true, [DRIVER_COLS.status]: 'on_trip' })
               .eq(DRIVER_COLS.id, userId);
             if (!isTracking) {
               try { await startForegroundTracking(userId); } catch {}
@@ -291,7 +301,7 @@ export function DriverProvider({ children }) {
         subscribeToTrips(userId);
 
         await supabase.from(TABLE_DRIVERS)
-          .update({ online: true, [DRIVER_COLS.status]: 'available' })
+          .update({ [DRIVER_COLS.online]: true, [DRIVER_COLS.status]: 'available' })
           .eq(DRIVER_COLS.id, userId);
 
         const { data } = await supabase
@@ -410,7 +420,95 @@ export function DriverProvider({ children }) {
       .subscribe((status) => console.log('[Realtime] dispatch channel:', status));
   }
 
+  function addCashFromPayment(paymentMethod, fareNum) {
+    if (!paymentMethod || !fareNum) return;
+    let cash = 0;
+    if (paymentMethod === 'cash') {
+      cash = fareNum;
+    } else if (paymentMethod.startsWith('split|')) {
+      const parts = paymentMethod.split('|');
+      for (let i = 1; i < parts.length - 1; i += 2) {
+        if (parts[i] === 'cash') cash += parseFloat(parts[i + 1]) || 0;
+      }
+    }
+    if (cash > 0) {
+      const next = cashRef.current + cash;
+      cashRef.current = next;
+      setCashCollected(next);
+      AsyncStorage.setItem(CASH_STORAGE_KEY, String(next)).catch(() => {});
+    }
+  }
+
+  async function buildShiftSummary() {
+    try {
+      if (isDemoRef.current) {
+        return {
+          tripsCompleted: 3, tripsCancelled: 0, tripsNoShow: 0,
+          totalEarned: 66, cashUsd: cashRef.current,
+          topAreas: ['Hamra', 'Verdun', 'Jounieh'], avgFare: 22, totalDistanceKm: 42,
+        };
+      }
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+
+      const shiftStart = startTimeRef.current
+        ? new Date(startTimeRef.current).toISOString()
+        : new Date(Date.now() - shiftSeconds * 1000).toISOString();
+
+      const { data } = await supabase
+        .from(TABLE_TRIPS)
+        .select(`${TRIP_COLS.status}, ${TRIP_COLS.fare}, ${TRIP_COLS.pickupAddress}, ${TRIP_COLS.distanceKm}`)
+        .eq(TRIP_COLS.driverId, user.id)
+        .gte('accepted_at', shiftStart);
+
+      let tripsCompleted = 0, tripsCancelled = 0, tripsNoShow = 0;
+      let totalEarned = 0, totalDistanceKm = 0;
+      const areaCounts = {};
+
+      (data ?? []).forEach(row => {
+        const status = row[TRIP_COLS.status];
+        const fare   = Number(row[TRIP_COLS.fare]) || 0;
+        const dist   = Number(row[TRIP_COLS.distanceKm]) || 0;
+        const pickup = row[TRIP_COLS.pickupAddress] ?? '';
+        if (status === 'completed') {
+          tripsCompleted++;
+          totalEarned      += fare;
+          totalDistanceKm  += dist;
+          const area = pickup.split(',')[0].trim();
+          if (area) areaCounts[area] = (areaCounts[area] || 0) + 1;
+        } else if (status === 'cancelled') {
+          tripsCancelled++;
+        } else if (status === 'no_show') {
+          tripsNoShow++;
+        }
+      });
+
+      const topAreas = Object.entries(areaCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([area]) => area);
+
+      return {
+        tripsCompleted,
+        tripsCancelled,
+        tripsNoShow,
+        totalEarned:     Math.round(totalEarned * 100) / 100,
+        cashUsd:         cashRef.current,
+        topAreas,
+        avgFare:         tripsCompleted > 0 ? Math.round(totalEarned / tripsCompleted * 100) / 100 : 0,
+        totalDistanceKm: Math.round(totalDistanceKm * 10) / 10,
+      };
+    } catch (e) {
+      console.warn('[DriverContext] buildShiftSummary error:', e.message);
+      return null;
+    }
+  }
+
   async function goOnline() {
+    cashRef.current = 0;
+    setCashCollected(0);
+    AsyncStorage.setItem(CASH_STORAGE_KEY, '0').catch(() => {});
+
     setDriverState(DRIVER_STATE.SCANNING);
 
     let user = null;
@@ -456,7 +554,7 @@ export function DriverProvider({ children }) {
 
     try {
       await supabase.from(TABLE_DRIVERS)
-        .update({ online: true, [DRIVER_COLS.status]: 'available' })
+        .update({ [DRIVER_COLS.online]: true, [DRIVER_COLS.status]: 'available' })
         .eq(DRIVER_COLS.id, user.id);
     } catch (e) { console.warn('[DriverContext] online mark error:', e.message); }
 
@@ -492,7 +590,7 @@ export function DriverProvider({ children }) {
 
   }
 
-  async function goOffline() {
+  async function goOffline(summaryData = null) {
     clearTimeout(scanTimeoutRef.current);
     setDriverState(DRIVER_STATE.OFFLINE);
     setActiveTrip(null);
@@ -501,6 +599,9 @@ export function DriverProvider({ children }) {
     setAvailableTrips([]);
     activeTripIdRef.current = null;
     userIdRef.current = null;
+
+    cashRef.current = 0;
+    setCashCollected(0);
 
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
@@ -514,16 +615,29 @@ export function DriverProvider({ children }) {
       if (currentShiftRef.current) {
         await supabase
           .from(TABLE_SHIFTS)
-          .update({ ended_at: new Date().toISOString(), duration_s: shiftSeconds })
+          .update({
+            ended_at:   new Date().toISOString(),
+            duration_s: shiftSeconds,
+            ...(summaryData ? {
+              trips_completed:   summaryData.tripsCompleted,
+              trips_cancelled:   summaryData.tripsCancelled,
+              trips_no_show:     summaryData.tripsNoShow,
+              total_earned_usd:  summaryData.totalEarned,
+              cash_usd:          summaryData.cashUsd,
+              top_areas:         JSON.stringify(summaryData.topAreas),
+              avg_fare_usd:      summaryData.avgFare,
+              total_distance_km: summaryData.totalDistanceKm,
+            } : {}),
+          })
           .eq('id', currentShiftRef.current);
         currentShiftRef.current = null;
       }
     } catch (e) { console.warn('[DriverContext] Shift end error:', e.message); }
 
-    // Clear persisted state so restore doesn't fire on next app open
     try {
       await AsyncStorage.removeItem(SHIFT_STORAGE_KEY);
       await AsyncStorage.removeItem(ACTIVE_TRIP_STORAGE_KEY);
+      await AsyncStorage.removeItem(CASH_STORAGE_KEY);
     } catch {}
   }
 
@@ -643,8 +757,9 @@ export function DriverProvider({ children }) {
   }
 
   async function completeTrip(paymentMethod = 'cash', customerRating = null) {
-    const tripId  = activeTripIdRef.current;
+    const tripId   = activeTripIdRef.current;
     const tripSnap = activeTrip;
+    addCashFromPayment(paymentMethod, tripSnap?.fareNum ?? 0);
     activeTripIdRef.current = null;
     setActiveTrip(null);
     setDriverState(DRIVER_STATE.SCANNING);
@@ -722,6 +837,8 @@ export function DriverProvider({ children }) {
         shiftSeconds,
         shiftTime: formatTime(shiftSeconds),
         isOnline:  driverState !== DRIVER_STATE.OFFLINE,
+        cashCollected,
+        buildShiftSummary,
         goOnline,
         goOffline,
         acceptTrip,

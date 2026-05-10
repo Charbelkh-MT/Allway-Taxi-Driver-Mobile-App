@@ -155,7 +155,17 @@ export const translations = {
     lightMode:         'Light Mode',
     switchAppearance:  'Switch app appearance',
     changePIN:         'Change PIN',
-    changePINSub:      'Contact admin to update',
+    changePINSub:      'Update your 4–6 digit PIN',
+    changePINModalSub: 'Choose a new 4–6 digit PIN for your account',
+    newPIN:            'NEW PIN',
+    confirmPIN:        'CONFIRM NEW PIN',
+    savePIN:           '✓  Save New PIN',
+    pinUpdated:        'PIN Updated!',
+    pinUpdatedSub:     'Your PIN has been successfully changed.',
+    pinMismatch:       'PINs do not match. Please try again.',
+    pinTooShort:       'PIN must be 4–6 digits.',
+    pinChangeError:    'Failed to update PIN. Please try again.',
+    pinNotAvailableDemo: 'PIN change is not available in demo mode.',
     language:          'Language',
     support:           'SUPPORT',
     callDispatcher:    'Call Dispatcher',
@@ -196,6 +206,28 @@ export const translations = {
     gettingDashboard:    'Getting your dashboard ready…',
     driverPortal:        '🚖  DRIVER PORTAL',
     loginError:          'Enter your phone number and a 4-digit PIN.',
+
+    // ── Shift summary ────────────────────────────────────────
+    shiftSummaryTitle:   "Today's Shift",
+    shiftSummaryLoading: 'Calculating your shift…',
+    continueWorking:     'Continue Working',
+    endShiftSendReport:  'End Shift & Send Report',
+    tripsCompleted:      'Trips Done',
+    cashToHandIn:        'Cash to Hand In',
+    cancelled:           'Cancelled',
+    noShows:             'No Shows',
+    mostActiveArea:      'Most Active Area',
+    avgFare:             'Avg Fare',
+
+    // ── Cash on hand ─────────────────────────────────────────
+    cashOnHand:          'Cash on hand',
+
+    // ── SOS ──────────────────────────────────────────────────
+    sosButton:           'Emergency',
+    sosButtonSub:        'Call Dispatcher immediately',
+    sosConfirmTitle:     'Call Dispatcher?',
+    sosConfirmMessage:   'This will immediately call the Allway Taxi operations line.',
+    sosCall:             'Call Now',
 
     // ── Quick actions ────────────────────────────────────────
     quickActions:        'QUICK ACTIONS',
@@ -363,7 +395,17 @@ export const translations = {
     lightMode:         'الوضع الفاتح',
     switchAppearance:  'تغيير مظهر التطبيق',
     changePIN:         'تغيير الرقم السري',
-    changePINSub:      'تواصل مع الإدارة للتغيير',
+    changePINSub:      'تحديث رقمك السري المكون من ٤-٦ أرقام',
+    changePINModalSub: 'اختر رقماً سرياً جديداً مكوناً من ٤-٦ أرقام',
+    newPIN:            'الرقم السري الجديد',
+    confirmPIN:        'تأكيد الرقم السري الجديد',
+    savePIN:           '✓  حفظ الرقم السري',
+    pinUpdated:        'تم تحديث الرقم السري!',
+    pinUpdatedSub:     'تم تغيير رقمك السري بنجاح.',
+    pinMismatch:       'الرقمان السريان غير متطابقين. حاول مجدداً.',
+    pinTooShort:       'يجب أن يتكون الرقم السري من ٤-٦ أرقام.',
+    pinChangeError:    'فشل تحديث الرقم السري. حاول مجدداً.',
+    pinNotAvailableDemo: 'تغيير الرقم السري غير متاح في وضع العرض.',
     language:          'اللغة',
     support:           'الدعم',
     callDispatcher:    'الاتصال بالمرسل',
@@ -404,6 +446,28 @@ export const translations = {
     gettingDashboard:    'جارٍ تجهيز لوحة التحكم…',
     driverPortal:        '🚖  بوابة السائق',
     loginError:          'أدخل رقم هاتفك والرقم السري.',
+
+    // ── Shift summary ────────────────────────────────────────
+    shiftSummaryTitle:   'ملخص المناوبة',
+    shiftSummaryLoading: 'جارٍ حساب مناوبتك…',
+    continueWorking:     'متابعة العمل',
+    endShiftSendReport:  'إنهاء المناوبة وإرسال التقرير',
+    tripsCompleted:      'رحلات منجزة',
+    cashToHandIn:        'النقد للتسليم',
+    cancelled:           'ملغاة',
+    noShows:             'لم يظهر',
+    mostActiveArea:      'المنطقة الأكثر نشاطاً',
+    avgFare:             'متوسط الأجرة',
+
+    // ── Cash on hand ─────────────────────────────────────────
+    cashOnHand:          'النقد في اليد',
+
+    // ── SOS ──────────────────────────────────────────────────
+    sosButton:           'طوارئ',
+    sosButtonSub:        'اتصل بالمرسل فوراً',
+    sosConfirmTitle:     'الاتصال بالمرسل؟',
+    sosConfirmMessage:   'سيتم الاتصال فوراً بخط عمليات Allway Taxi.',
+    sosCall:             'اتصل الآن',
 
     // ── Quick actions ────────────────────────────────────────
     quickActions:        'إجراءات سريعة',
