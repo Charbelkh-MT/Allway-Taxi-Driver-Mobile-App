@@ -9,7 +9,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useDriver } from '../context/DriverContext';
 import { useLanguage } from '../context/LanguageContext';
 import { FONTS, RADIUS } from '../theme';
-import { relativeTime } from '../utils/dateUtils';
+import { relativeTime, formatScheduledTime } from '../utils/dateUtils';
 import AppHeader from '../components/AppHeader';
 import { SkeletonTripCard } from '../components/Skeleton';
 import { supabase } from '../utils/supabase';
@@ -17,6 +17,7 @@ import { TABLE_TRIPS, TRIP_COLS } from '../config';
 
 const FILTERS = [
   { id: 'all',       labelKey: 'filterAll'         },
+  { id: 'scheduled', labelKey: 'filterScheduled'   },
   { id: 'completed', labelKey: 'filterCompleted'   },
   { id: 'accepted',  labelKey: 'filterDispatching' },
   { id: 'no_show',   labelKey: 'statusNoShow'      },
@@ -24,12 +25,13 @@ const FILTERS = [
 ];
 
 const STATUS_CONFIG = {
-  pending:   { labelKey: 'statusPending',   accentKey: 'yellow', icon: '⏳' },
-  accepted:  { labelKey: 'statusAccepted',  accentKey: 'yellow', icon: '🚕' },
-  picked_up: { labelKey: 'statusPickedUp',  accentKey: 'green',  icon: '🟢' },
-  completed: { labelKey: 'statusCompleted', accentKey: 'green',  icon: '✓'  },
-  no_show:   { labelKey: 'statusNoShow',    accentKey: 'red',    icon: '👻' },
-  cancelled: { labelKey: 'statusCancelled', accentKey: 'red',    icon: '✕'  },
+  scheduled: { labelKey: 'filterScheduled',  accentKey: 'yellow', icon: '🕐' },
+  pending:   { labelKey: 'statusPending',    accentKey: 'yellow', icon: '⏳' },
+  accepted:  { labelKey: 'statusAccepted',   accentKey: 'yellow', icon: '🚕' },
+  picked_up: { labelKey: 'statusPickedUp',   accentKey: 'green',  icon: '🟢' },
+  completed: { labelKey: 'statusCompleted',  accentKey: 'green',  icon: '✓'  },
+  no_show:   { labelKey: 'statusNoShow',     accentKey: 'red',    icon: '👻' },
+  cancelled: { labelKey: 'statusCancelled',  accentKey: 'red',    icon: '✕'  },
 };
 
 const Separator   = () => <View style={{ height: 10 }} />;
@@ -73,7 +75,7 @@ export default function TripsScreen() {
           TRIP_COLS.pickupAddress, TRIP_COLS.dropoffAddress,
           TRIP_COLS.fare, TRIP_COLS.distanceKm,
           TRIP_COLS.status, TRIP_COLS.paymentMethod,
-          TRIP_COLS.createdAt, 'completed_at',
+          TRIP_COLS.scheduledFor, TRIP_COLS.createdAt, 'completed_at',
         ].join(', '))
         .eq(TRIP_COLS.driverId, user.id)
         .order(TRIP_COLS.createdAt, { ascending: false })
@@ -95,6 +97,7 @@ export default function TripsScreen() {
           paymentMethod: row[TRIP_COLS.paymentMethod] ?? '',
           time:          relativeTime(row[TRIP_COLS.createdAt]),
           completedAt:   row.completed_at ? relativeTime(row.completed_at) : '',
+          scheduledFor:  row[TRIP_COLS.scheduledFor] ?? null,
         };
       });
       setTrips(mapped);
@@ -247,7 +250,13 @@ const TripRow = memo(function TripRow({ trip, index = 0, onPress }) {
           <View style={styles.cardTop}>
             <View style={styles.cardTopLeft}>
               <Text style={[styles.cardName, { color: colors.textPrimary }]}>{trip.name}</Text>
-              <Text style={[styles.cardTime, { color: colors.textMuted }]}>{trip.time}</Text>
+              {trip.status === 'scheduled' && trip.scheduledFor ? (
+                <Text style={[styles.cardTime, { color: colors.yellow }]}>
+                  🕐 {formatScheduledTime(trip.scheduledFor)}
+                </Text>
+              ) : (
+                <Text style={[styles.cardTime, { color: colors.textMuted }]}>{trip.time}</Text>
+              )}
             </View>
             <View style={styles.cardTopRight}>
               <Text style={[styles.cardFare, { color: colors.yellow }]}>{trip.fare || '—'}</Text>
