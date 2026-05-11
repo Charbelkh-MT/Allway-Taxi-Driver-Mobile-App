@@ -685,7 +685,8 @@ export function DriverProvider({ children }) {
 
     try {
       if (currentShiftRef.current) {
-        await supabase
+        const shiftId = currentShiftRef.current;
+        const { error: shiftError } = await supabase
           .from(TABLE_SHIFTS)
           .update({
             ended_at:   new Date().toISOString(),
@@ -701,10 +702,22 @@ export function DriverProvider({ children }) {
               total_distance_km: summaryData.totalDistanceKm,
             } : {}),
           })
-          .eq('id', currentShiftRef.current);
+          .eq('id', shiftId);
+
+        if (shiftError) {
+          console.warn('[Shift] Report save failed:', shiftError.message);
+          Alert.alert('Report Error', 'Shift ended but the report could not be saved. Please inform the dispatcher.');
+        } else {
+          console.log(
+            `[Shift] Report saved — id: ${shiftId}` +
+            (summaryData
+              ? `, trips: ${summaryData.tripsCompleted}, earned: $${summaryData.totalEarned}, cash: $${summaryData.cashUsd}`
+              : ' (no summary data)')
+          );
+        }
         currentShiftRef.current = null;
       }
-    } catch (e) { console.warn('[DriverContext] Shift end error:', e.message); }
+    } catch (e) { console.warn('[Shift] Unexpected error ending shift:', e.message); }
 
     try {
       await AsyncStorage.removeItem(SHIFT_STORAGE_KEY);

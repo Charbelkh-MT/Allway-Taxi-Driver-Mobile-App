@@ -191,11 +191,6 @@ export default function HomeScreen() {
           </FadeInView>
         )}
 
-        {isOnline && (
-          <FadeInView delay={160} distance={10}>
-            <SosButton />
-          </FadeInView>
-        )}
 
         {driverState === DRIVER_STATE.SCANNING && <FadeInView delay={160} distance={16}><ScanningRadar /></FadeInView>}
         {driverState === DRIVER_STATE.ACTIVE   && activeTrip && (
