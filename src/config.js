@@ -158,7 +158,7 @@
 //   -- Leave driver_id NULL — the first driver to accept claims it atomically.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const DISPATCHER_PHONE = '+9611234567'; // replace before go-live
+export const DISPATCHER_PHONE = '+96178999240';
 
 export const SUPABASE_URL = 'https://hfybipzfzmxucuiaxbeu.supabase.co';
 export const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmeWJpcHpmem14dWN1aWF4YmV1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwMTE1OTMsImV4cCI6MjA5MTU4NzU5M30.EBOrBEk-_d02799FL3JjcNkRCi-sED0T_ZnTrksdicY';

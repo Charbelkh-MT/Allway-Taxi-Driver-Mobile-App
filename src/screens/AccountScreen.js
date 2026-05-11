@@ -22,7 +22,7 @@ import ReportIssueModal from '../components/ReportIssueModal';
 import ChangePinModal from '../components/ChangePinModal';
 import LegalModal from '../components/LegalModal';
 import HelpSupportModal from '../components/HelpSupportModal';
-import { TABLE_TRIPS, TRIP_COLS } from '../config';
+import { TABLE_TRIPS, TRIP_COLS, DISPATCHER_PHONE } from '../config';
 
 function sumRows(rows, fareCol) {
   const total = rows.reduce((s, r) => s + (Number(r[fareCol]) || 0), 0);
@@ -320,7 +320,7 @@ export default function AccountScreen() {
           <Text style={[styles.section, { color: colors.textMuted }]}>{t('support')}</Text>
           <View style={[styles.card, { backgroundColor: colors.bgCard, borderColor: colors.border }, !isDark && styles.shadow]}>
             <TouchableOpacity style={[styles.settingRow, { borderBottomColor: colors.border }]} activeOpacity={0.75}
-              onPress={async () => { await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); Linking.openURL('tel:+9611234567'); }}>
+              onPress={async () => { await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); Linking.openURL(`tel:${DISPATCHER_PHONE}`); }}>
               <Text style={styles.settingIcon}>📞</Text>
               <View style={styles.settingText}>
                 <Text style={[styles.settingTitle, { color: colors.textPrimary }]}>{t('callDispatcher')}</Text>

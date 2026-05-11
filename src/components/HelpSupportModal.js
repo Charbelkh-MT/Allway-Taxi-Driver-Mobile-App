@@ -10,8 +10,8 @@ import { useLanguage } from '../context/LanguageContext';
 import { FONTS, RADIUS } from '../theme';
 
 // Replace with real numbers before go-live
-const SUPPORT_PHONE    = '+9611234567';
-const WHATSAPP_NUMBER  = '+9611234567';
+const SUPPORT_PHONE    = '+96178999240';
+const WHATSAPP_NUMBER  = '+96178999240';
 
 const FAQS = [
   {

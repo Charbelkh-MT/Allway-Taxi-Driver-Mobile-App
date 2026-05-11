@@ -5,7 +5,7 @@ import { useTheme } from '../context/ThemeContext';
 import { FONTS, RADIUS } from '../theme';
 import ReportIssueModal from './ReportIssueModal';
 
-const SUPPORT_PHONE = '+9611234567';
+const SUPPORT_PHONE = '+96178999240';
 
 export default function QuickActions() {
   const { colors } = useTheme();
