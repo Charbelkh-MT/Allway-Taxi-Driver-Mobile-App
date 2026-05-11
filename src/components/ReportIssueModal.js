@@ -3,7 +3,13 @@ import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
   Modal, Animated, Alert, ScrollView,
 } from 'react-native';
-import { Audio } from 'expo-av';
+import {
+  useAudioRecorder,
+  RecordingPresets,
+  setAudioModeAsync,
+  requestRecordingPermissionsAsync,
+  createAudioPlayer,
+} from 'expo-audio';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Haptics from 'expo-haptics';
 import { supabase } from '../utils/supabase';
@@ -14,7 +20,6 @@ import { useLanguage } from '../context/LanguageContext';
 import { FONTS, RADIUS } from '../theme';
 
 const BAR_COUNT = 40;
-const POLL_MS   = 80;
 const MIN_DB    = -55;
 const MAX_DB    = -5;
 
@@ -53,7 +58,6 @@ function RecordingWaveform({ levels, color }) {
   );
 }
 
-// Uses Animated.Value so progress updates bypass the React reconciler — no re-renders
 function PlaybackWaveform({ levels, progressAnim, color, dimColor }) {
   const [containerW, setContainerW] = useState(300);
 
@@ -74,8 +78,6 @@ function PlaybackWaveform({ levels, progressAnim, color, dimColor }) {
       {levels.map((lvl, i) => (
         <View key={i} style={[waveStyles.bar, { height: Math.max(3, lvl * 42), backgroundColor: dimColor, opacity: 0.3 }]} />
       ))}
-
-      {/* Colored overlay clipped to the played portion — native-driven */}
       <Animated.View style={[waveStyles.overlay, { width: overlayWidth }]}>
         <View style={[waveStyles.innerRow, { width: containerW }]}>
           {levels.map((lvl, i) => (
@@ -83,7 +85,6 @@ function PlaybackWaveform({ levels, progressAnim, color, dimColor }) {
           ))}
         </View>
       </Animated.View>
-
       <Animated.View style={[waveStyles.playhead, { backgroundColor: color, left: circleLeft }]} />
     </View>
   );
@@ -120,6 +121,7 @@ function ChipSelector({ options, selected, onSelect, colors }) {
     </View>
   );
 }
+
 const chipStyles = StyleSheet.create({
   row:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip:  { borderWidth: 1.5, borderRadius: RADIUS.full, paddingVertical: 7, paddingHorizontal: 14 },
@@ -131,26 +133,38 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
   const { t }      = useLanguage();
   const insets     = useSafeAreaInsets();
 
-  const [title,         setTitle]         = useState('');
-  const [incidentType,  setIncidentType]  = useState('other');
-  const [severity,      setSeverity]      = useState('medium');
-  const [isRecording,   setIsRecording]   = useState(false);
-  const [recordingUri,  setRecordingUri]  = useState(null);
-  const [duration,      setDuration]      = useState(0);
-  const [isPlaying,     setIsPlaying]     = useState(false);
-  const progressAnim = useRef(new Animated.Value(0)).current;
-  const [sent,          setSent]          = useState(false);
-  const [isSending,     setIsSending]     = useState(false);
-  const [levels,        setLevels]        = useState(Array(BAR_COUNT).fill(0));
-  const [savedLevels,   setSavedLevels]   = useState(Array(BAR_COUNT).fill(0));
+  const [title,        setTitle]        = useState('');
+  const [incidentType, setIncidentType] = useState('other');
+  const [severity,     setSeverity]     = useState('medium');
+  const [isRecording,  setIsRecording]  = useState(false);
+  const [recordingUri, setRecordingUri] = useState(null);
+  const [duration,     setDuration]     = useState(0);
+  const [isPlaying,    setIsPlaying]    = useState(false);
+  const [sent,         setSent]         = useState(false);
+  const [isSending,    setIsSending]    = useState(false);
+  const [levels,       setLevels]       = useState(Array(BAR_COUNT).fill(0));
+  const [savedLevels,  setSavedLevels]  = useState(Array(BAR_COUNT).fill(0));
 
-  const recRef     = useRef(null);
-  const soundRef   = useRef(null);
-  const timerRef   = useRef(null);
-  const meterRef   = useRef(null);
-  const levelsRef  = useRef(Array(BAR_COUNT).fill(0));
-  const slideAnim  = useRef(new Animated.Value(700)).current;
-  const fadeAnim   = useRef(new Animated.Value(0)).current;
+  const progressAnim   = useRef(new Animated.Value(0)).current;
+  const isRecordingRef = useRef(false);
+  const playerRef      = useRef(null);
+  const timerRef       = useRef(null);
+  const progressRef    = useRef(null);
+  const levelsRef      = useRef(Array(BAR_COUNT).fill(0));
+  const slideAnim      = useRef(new Animated.Value(700)).current;
+  const fadeAnim       = useRef(new Animated.Value(0)).current;
+
+  // useAudioRecorder hook — metering updates arrive via the status listener
+  const recorder = useAudioRecorder(
+    { ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true },
+    (status) => {
+      if (!isRecordingRef.current) return;
+      const level = dbToLevel(status.metering ?? MIN_DB);
+      const bar   = Math.max(0, Math.min(1, level + (Math.random() - 0.5) * 0.06));
+      levelsRef.current = [...levelsRef.current.slice(1), bar];
+      setLevels([...levelsRef.current]);
+    }
+  );
 
   useEffect(() => {
     if (!visible) return;
@@ -164,54 +178,42 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
 
   async function startRecording() {
     try {
-      const { granted } = await Audio.requestPermissionsAsync();
+      const { granted } = await requestRecordingPermissionsAsync();
       if (!granted) { Alert.alert('Microphone Access', 'Please allow microphone access.'); return; }
-      if (recRef.current) {
-        try { await recRef.current.stopAndUnloadAsync(); } catch {}
-        recRef.current = null;
-      }
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-      const { recording } = await Audio.Recording.createAsync({
-        ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
-        isMeteringEnabled: true,
-      });
-      recRef.current    = recording;
+
+      await setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+
       levelsRef.current = Array(BAR_COUNT).fill(0);
       setLevels(Array(BAR_COUNT).fill(0));
       setRecordingUri(null);
       setDuration(0);
+
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+
+      isRecordingRef.current = true;
       setIsRecording(true);
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
 
       timerRef.current = setInterval(() => {
-        setDuration(prev => { if (prev >= 120) { stopRecording(); return prev; } return prev + 1; });
+        setDuration(prev => {
+          if (prev >= 120) { stopRecording(); return prev; }
+          return prev + 1;
+        });
       }, 1000);
-
-      meterRef.current = setInterval(async () => {
-        if (!recRef.current) return;
-        try {
-          const status = await recRef.current.getStatusAsync();
-          const level  = dbToLevel(status.metering ?? MIN_DB);
-          const bar    = Math.max(0, Math.min(1, level + (Math.random() - 0.5) * 0.06));
-          levelsRef.current = [...levelsRef.current.slice(1), bar];
-          setLevels([...levelsRef.current]);
-        } catch {}
-      }, POLL_MS);
     } catch (e) { console.warn('[Record] start:', e.message); }
   }
 
   async function stopRecording() {
     clearInterval(timerRef.current);
-    clearInterval(meterRef.current);
-    if (!recRef.current) return;
+    isRecordingRef.current = false;
     try {
-      await recRef.current.stopAndUnloadAsync();
-      const uri = recRef.current.getURI();
-      recRef.current = null;
+      await recorder.stop();
+      const uri = recorder.uri;
       setIsRecording(false);
       setRecordingUri(uri);
       setSavedLevels([...levelsRef.current]);
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true });
+      await setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true });
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e) { console.warn('[Record] stop:', e.message); }
   }
@@ -219,37 +221,37 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
   async function playBack() {
     if (!recordingUri) return;
     try {
-      if (soundRef.current) { await soundRef.current.unloadAsync(); soundRef.current = null; }
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true });
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: recordingUri },
-        { shouldPlay: true, progressUpdateIntervalMillis: 50 }
-      );
-      soundRef.current = sound;
+      stopPlayback();
+      await setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true });
+
+      const player = createAudioPlayer({ uri: recordingUri });
+      playerRef.current = player;
+      player.play();
       setIsPlaying(true);
       progressAnim.setValue(0);
 
-      sound.setOnPlaybackStatusUpdate(status => {
-        if (!status.isLoaded) return;
-        if (status.durationMillis) {
-          // Direct setValue bypasses React for a silky-smooth update
-          progressAnim.setValue(status.positionMillis / status.durationMillis);
-        }
-        if (status.didJustFinish) {
+      // Poll progress every 50ms — bypasses React for smooth animation
+      progressRef.current = setInterval(() => {
+        if (!playerRef.current) { clearInterval(progressRef.current); return; }
+        const pos = player.currentTime ?? 0;
+        const dur = player.duration   ?? 0;
+        if (dur > 0) progressAnim.setValue(pos / dur);
+        if (!player.playing && pos > 0) {
+          clearInterval(progressRef.current);
           setIsPlaying(false);
           progressAnim.setValue(0);
-          sound.unloadAsync();
-          soundRef.current = null;
+          player.remove();
+          playerRef.current = null;
         }
-      });
+      }, 50);
     } catch (e) { console.warn('[Playback]:', e.message); }
   }
 
-  async function stopPlayback() {
-    if (soundRef.current) {
-      await soundRef.current.stopAsync();
-      await soundRef.current.unloadAsync();
-      soundRef.current = null;
+  function stopPlayback() {
+    clearInterval(progressRef.current);
+    if (playerRef.current) {
+      try { playerRef.current.pause(); playerRef.current.remove(); } catch {}
+      playerRef.current = null;
     }
     setIsPlaying(false);
     progressAnim.setValue(0);
@@ -272,15 +274,14 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const base64         = await FileSystem.readAsStringAsync(recordingUri, { encoding: FileSystem.EncodingType.Base64 });
-      const bytes          = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-      const fileName       = `${user.id}/${Date.now()}.m4a`;
+      const base64   = await FileSystem.readAsStringAsync(recordingUri, { encoding: FileSystem.EncodingType.Base64 });
+      const bytes    = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+      const fileName = `${user.id}/${Date.now()}.m4a`;
       const { error: uploadError } = await supabase.storage
         .from(BUCKET_INCIDENTS)
         .upload(fileName, bytes, { contentType: 'audio/m4a', upsert: false });
       if (uploadError) throw uploadError;
 
-      // Store the storage path only — CRM generates signed URLs on demand via the service role
       await supabase.from(TABLE_INCIDENTS).insert({
         driver_id:     user.id,
         trip_id:       activeTripId ?? null,
@@ -308,9 +309,9 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
   }
 
   function close() {
-    if (isRecording) stopRecording();
-    if (soundRef.current) { soundRef.current.unloadAsync(); soundRef.current = null; }
-    clearInterval(timerRef.current); clearInterval(meterRef.current);
+    if (isRecordingRef.current) stopRecording();
+    stopPlayback();
+    clearInterval(timerRef.current);
     Animated.parallel([
       Animated.timing(slideAnim, { toValue: 700, duration: 250, useNativeDriver: true }),
       Animated.timing(fadeAnim,  { toValue: 0,   duration: 200, useNativeDriver: true }),
