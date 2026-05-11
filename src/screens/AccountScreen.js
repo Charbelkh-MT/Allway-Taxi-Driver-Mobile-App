@@ -21,6 +21,7 @@ import { SkeletonEarningsRow } from '../components/Skeleton';
 import ReportIssueModal from '../components/ReportIssueModal';
 import ChangePinModal from '../components/ChangePinModal';
 import LegalModal from '../components/LegalModal';
+import HelpSupportModal from '../components/HelpSupportModal';
 import { TABLE_TRIPS, TRIP_COLS } from '../config';
 
 function sumRows(rows, fareCol) {
@@ -71,9 +72,10 @@ export default function AccountScreen() {
   const [earnings, setEarnings]         = useState(null);
   const [loading, setLoading]           = useState(true);
   const [refreshing, setRefreshing]     = useState(false);
-  const [showPinModal, setShowPinModal]     = useState(false);
-  const [showReport,   setShowReport]       = useState(false);
-  const [legalType,    setLegalType]        = useState(null);
+  const [showPinModal,  setShowPinModal]    = useState(false);
+  const [showReport,    setShowReport]      = useState(false);
+  const [showHelp,      setShowHelp]        = useState(false);
+  const [legalType,     setLegalType]       = useState(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const fetchEarnings = useCallback(async () => {
@@ -325,7 +327,7 @@ export default function AccountScreen() {
               <Text style={[styles.chevron, { color: colors.textMuted }]}>›</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.settingRow, { borderBottomColor: colors.border }]} activeOpacity={0.75}
-              onPress={() => Alert.alert('Help & Support', 'For help, contact your dispatcher or call the Allway Taxi operations centre.')}>
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowHelp(true); }}>
               <Text style={styles.settingIcon}>❓</Text>
               <View style={styles.settingText}>
                 <Text style={[styles.settingTitle, { color: colors.textPrimary }]}>{t('helpSupport')}</Text>
@@ -381,9 +383,10 @@ export default function AccountScreen() {
         </View>
       </ScrollView>
 
-      <ReportIssueModal visible={showReport}           onClose={() => setShowReport(false)} />
-      <ChangePinModal   visible={showPinModal}          onClose={() => setShowPinModal(false)} />
-      <LegalModal       type={legalType ?? 'terms'}     visible={!!legalType} onClose={() => setLegalType(null)} />
+      <ReportIssueModal  visible={showReport}           onClose={() => setShowReport(false)} />
+      <ChangePinModal    visible={showPinModal}          onClose={() => setShowPinModal(false)} />
+      <HelpSupportModal  visible={showHelp}              onClose={() => setShowHelp(false)} />
+      <LegalModal        type={legalType ?? 'terms'}     visible={!!legalType} onClose={() => setLegalType(null)} />
     </View>
   );
 }

@@ -4,7 +4,6 @@ import {
   Modal, Animated, Alert, ScrollView,
 } from 'react-native';
 import { Audio } from 'expo-av';
-import * as FileSystem from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
 import { supabase } from '../utils/supabase';
 import { TABLE_INCIDENTS, BUCKET_INCIDENTS } from '../config';
@@ -272,12 +271,12 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const base64   = await FileSystem.readAsStringAsync(recordingUri, { encoding: 'base64' });
-      const bytes    = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-      const fileName = `${user.id}/${Date.now()}.m4a`;
+      const fileName   = `${user.id}/${Date.now()}.m4a`;
+      const fileRes    = await fetch(recordingUri);
+      const blob       = await fileRes.blob();
       const { error: uploadError } = await supabase.storage
         .from(BUCKET_INCIDENTS)
-        .upload(fileName, bytes, { contentType: 'audio/m4a', upsert: false });
+        .upload(fileName, blob, { contentType: 'audio/m4a', upsert: false });
       if (uploadError) throw uploadError;
 
       // Store the storage path only — CRM generates signed URLs on demand via the service role
