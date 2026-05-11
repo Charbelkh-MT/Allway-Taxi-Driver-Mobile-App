@@ -68,17 +68,19 @@ export function ThemeProvider({ children }) {
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY).then(val => {
-      const dark = val === 'dark';
-      setIsDark(dark);
-      applyNavBar(dark);
+      setIsDark(val === 'dark');
     });
   }, []);
+
+  // Apply nav bar after React commits the new isDark value
+  useEffect(() => {
+    applyNavBar(isDark);
+  }, [isDark]);
 
   const toggleTheme = useCallback(() => {
     setIsDark(prev => {
       const next = !prev;
       AsyncStorage.setItem(STORAGE_KEY, next ? 'dark' : 'light');
-      applyNavBar(next);
       return next;
     });
   }, []);
