@@ -292,6 +292,7 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
       });
 
       setSent(true);
+      console.log(`[ReportIssue] Report submitted — type: ${incidentType}, severity: ${severity}, file: ${fileName}`);
     } catch (e) {
       console.warn('[ReportIssue] upload:', e.message);
       Alert.alert('Error', 'Failed to submit report. Please try again.');
