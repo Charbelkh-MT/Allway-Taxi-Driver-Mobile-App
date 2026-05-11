@@ -10,9 +10,8 @@ import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 import { FONTS, RADIUS } from '../theme';
 
-// TODO: replace with real numbers before go-live
-const WISH_NUMBER   = '+961 71 234 567';
-const WALLET_NUMBER = '+961 70 987 654';
+const WISH_NUMBER   = '+961 78 999 240';
+const WALLET_NUMBER = '+961 78 999 240';
 
 const ALL_METHODS = [
   { id: 'cash',   icon: '💵', labelKey: 'cash',   subKey: 'cashSub',   color: 'green'  },
