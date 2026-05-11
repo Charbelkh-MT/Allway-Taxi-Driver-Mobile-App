@@ -56,7 +56,8 @@ const STORAGE_KEY = 'allway_theme';
 function applyNavBar(dark) {
   if (Platform.OS !== 'android' || !NavigationBar) return;
   try {
-    NavigationBar.setBackgroundColorAsync(dark ? '#000000' : '#FFFFFF');
+    // Edge-to-edge mode: nav bar is transparent, app background shows through.
+    // Only button style is needed — icons turn white in dark mode, dark in light mode.
     NavigationBar.setButtonStyleAsync(dark ? 'light' : 'dark');
   } catch {}
 }
