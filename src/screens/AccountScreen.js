@@ -128,7 +128,7 @@ export default function AccountScreen() {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.7,
@@ -155,7 +155,9 @@ export default function AccountScreen() {
 
       await supabase.from('drivers').update({ photo_url: publicUrl }).eq('id', user.id);
       setDriver(prev => ({ ...prev, photoUrl: publicUrl }));
+      console.log(`[Profile] Photo uploaded successfully — path: ${path}, url: ${publicUrl}`);
     } catch (e) {
+      console.warn('[Profile] Photo upload failed:', e.message);
       Alert.alert('Upload failed', e.message);
     } finally {
       setUploadingPhoto(false);
