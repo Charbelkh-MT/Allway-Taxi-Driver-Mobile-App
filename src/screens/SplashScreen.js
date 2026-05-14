@@ -2,11 +2,13 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 import { FONTS } from '../theme';
 
 export default function SplashScreen() {
   const navigation   = useNavigation();
   const { colors }   = useTheme();
+  const { t }        = useLanguage();
   const opacity      = useRef(new Animated.Value(0)).current;
   const scale        = useRef(new Animated.Value(0.88)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
@@ -32,7 +34,7 @@ export default function SplashScreen() {
           style={styles.logo}
           resizeMode="cover"
         />
-        <Text style={[styles.subtitle, { color: colors.textMuted }]}>Driver Portal</Text>
+        <Text style={[styles.subtitle, { color: colors.textMuted }]}>{t('driverPortal')}</Text>
       </Animated.View>
 
       <View style={[styles.track, { backgroundColor: colors.border }]}>

@@ -6,6 +6,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 import { FONTS, RADIUS } from '../theme';
 
 const { width: SCREEN_W }  = Dimensions.get('window');
@@ -13,14 +14,14 @@ const PAGE_W               = SCREEN_W;
 const LARGE_GROUP_THRESHOLD = 6;
 const ORANGE               = '#F5A623';
 
-function TripCard({ trip, onAccept, colors, isDark }) {
+function TripCard({ trip, onAccept, colors, isDark, t }) {
   return (
     <View style={[styles.card, { backgroundColor: colors.bgCard, borderColor: colors.border }]}>
 
       <View style={[styles.fareRow, { backgroundColor: `${colors.yellow}12`, borderColor: `${colors.yellow}30` }]}>
         <View>
           <Text style={[styles.fareVal, { color: colors.yellow }]}>{trip.fare}</Text>
-          <Text style={[styles.fareLabel, { color: colors.textMuted }]}>FARE</Text>
+          <Text style={[styles.fareLabel, { color: colors.textMuted }]}>{t('fare')}</Text>
         </View>
         {!!trip.dist && (
           <View style={[styles.distPill, { backgroundColor: colors.bgCard, borderColor: colors.border }]}>
@@ -33,7 +34,7 @@ function TripCard({ trip, onAccept, colors, isDark }) {
         <View style={styles.addrRow}>
           <View style={[styles.addrDot, { backgroundColor: colors.green }]} />
           <View style={styles.addrBody}>
-            <Text style={[styles.addrLabel, { color: colors.textMuted }]}>PICKUP</Text>
+            <Text style={[styles.addrLabel, { color: colors.textMuted }]}>{t('pickup')}</Text>
             <Text style={[styles.addrText, { color: colors.textPrimary }]} numberOfLines={2}>{trip.pickup}</Text>
           </View>
         </View>
@@ -41,7 +42,7 @@ function TripCard({ trip, onAccept, colors, isDark }) {
         <View style={styles.addrRow}>
           <View style={[styles.addrDot, { backgroundColor: colors.red }]} />
           <View style={styles.addrBody}>
-            <Text style={[styles.addrLabel, { color: colors.textMuted }]}>DROP-OFF</Text>
+            <Text style={[styles.addrLabel, { color: colors.textMuted }]}>{t('dropoff')}</Text>
             <Text style={[styles.addrText, { color: colors.textPrimary }]} numberOfLines={2}>{trip.dropoff}</Text>
           </View>
         </View>
@@ -55,24 +56,24 @@ function TripCard({ trip, onAccept, colors, isDark }) {
         </View>
         <View style={{ flex: 1 }}>
           <Text style={[styles.custName, { color: colors.textPrimary }]}>
-            {trip.customerFull || trip.customer || 'Passenger'}
+            {trip.customerFull || trip.customer || t('passenger')}
           </Text>
           {!!trip.phone && (
             <Text style={[styles.custPhone, { color: colors.textMuted }]}>{trip.phone}</Text>
           )}
         </View>
-        <Text style={[styles.custLabel, { color: colors.textDisabled }]}>RIDER</Text>
+        <Text style={[styles.custLabel, { color: colors.textDisabled }]}>{t('rider')}</Text>
       </View>
 
       {(trip.groupSize ?? 0) > LARGE_GROUP_THRESHOLD && (
         <View style={[styles.largeBadge, { backgroundColor: `${ORANGE}15`, borderColor: `${ORANGE}40` }]}>
-          <Text style={[styles.largeBadgeText, { color: ORANGE }]}>👥  Large group — {trip.groupSize} people</Text>
+          <Text style={[styles.largeBadgeText, { color: ORANGE }]}>👥  {t('largeGroup')} — {trip.groupSize} {t('people')}</Text>
         </View>
       )}
 
       {!!trip.notes && (
         <View style={[styles.notesBlock, { backgroundColor: `${ORANGE}10`, borderColor: `${ORANGE}35` }]}>
-          <Text style={[styles.notesLabel, { color: ORANGE }]}>📋  Dispatcher Notes</Text>
+          <Text style={[styles.notesLabel, { color: ORANGE }]}>📋  {t('dispatcherNotes')}</Text>
           <Text style={[styles.notesText, { color: colors.textSecondary }]}>{trip.notes}</Text>
         </View>
       )}
@@ -90,7 +91,7 @@ function TripCard({ trip, onAccept, colors, isDark }) {
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
           style={styles.acceptBtn}
         >
-          <Text style={styles.acceptText}>✓  Accept This Trip</Text>
+          <Text style={styles.acceptText}>✓  {t('acceptTrip').replace('✓  ', '')}</Text>
         </LinearGradient>
       </TouchableOpacity>
     </View>
@@ -99,6 +100,7 @@ function TripCard({ trip, onAccept, colors, isDark }) {
 
 export default function AvailableTripsSheet({ trips, onAccept, onClose }) {
   const { colors, isDark } = useTheme();
+  const { t } = useLanguage();
   const scaleAnim = useRef(new Animated.Value(0.88)).current;
   const fadeAnim  = useRef(new Animated.Value(0)).current;
   const flatRef   = useRef(null);
@@ -133,10 +135,10 @@ export default function AvailableTripsSheet({ trips, onAccept, onClose }) {
           <View style={styles.popupHeader}>
             <View>
               <Text style={[styles.popupTitle, { color: colors.textPrimary }]}>
-                Available Trips
+                {t('availableTrips')}
               </Text>
               <Text style={[styles.popupSub, { color: colors.textMuted }]}>
-                {currentIndex + 1} of {trips.length} · swipe to browse
+                {currentIndex + 1} of {trips.length} · {t('swipeToBrowse')}
               </Text>
             </View>
             <TouchableOpacity
@@ -183,6 +185,7 @@ export default function AvailableTripsSheet({ trips, onAccept, onClose }) {
                   onAccept={onAccept}
                   colors={colors}
                   isDark={isDark}
+                  t={t}
                 />
               </View>
             )}

@@ -465,7 +465,12 @@ export function DriverProvider({ children }) {
         { event: 'DELETE', schema: 'public', table: TABLE_TRIPS },
         async () => { await syncPendingTrips(); }
       )
-      .subscribe((status) => console.log('[Realtime] dispatch channel:', status));
+      .subscribe((status) => {
+        console.log('[Realtime] dispatch channel:', status);
+        // On reconnect after a dropped connection, re-sync the pending queue so
+        // any trips dispatched while offline are recovered immediately.
+        if (status === 'SUBSCRIBED') syncPendingTrips();
+      });
   }
 
   function addCashFromPayment(paymentMethod, fareNum) {

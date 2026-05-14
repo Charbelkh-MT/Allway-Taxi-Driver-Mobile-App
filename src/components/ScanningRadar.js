@@ -1,12 +1,14 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 import { FONTS, RADIUS } from '../theme';
 
 const RADAR_SIZE = 96;
 
 export default function ScanningRadar() {
   const { colors } = useTheme();
+  const { t } = useLanguage();
   const rotation = useRef(new Animated.Value(0)).current;
   const blip1    = useRef(new Animated.Value(1)).current;
   const blip2    = useRef(new Animated.Value(1)).current;
@@ -55,8 +57,8 @@ export default function ScanningRadar() {
           <Animated.View style={[styles.blip, styles.blip2, { backgroundColor: colors.green, opacity: blip2 }]} />
           <View style={[styles.centerDot, { backgroundColor: colors.green }]} />
         </View>
-        <Text style={[styles.title, { color: colors.textSecondary }]}>Scanning for trips…</Text>
-        <Text style={[styles.sub,   { color: `${colors.green}80` }]}>Live matching in your area</Text>
+        <Text style={[styles.title, { color: colors.textSecondary }]}>{t('scanningForTrips')}</Text>
+        <Text style={[styles.sub,   { color: `${colors.green}80` }]}>{t('liveMatchingArea')}</Text>
       </View>
     </View>
   );

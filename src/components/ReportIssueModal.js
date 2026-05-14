@@ -24,18 +24,18 @@ const MIN_DB    = -55;
 const MAX_DB    = -5;
 
 const INCIDENT_TYPES = [
-  { id: 'accident',       label: '🚗  Accident',        color: '#F09595' },
-  { id: 'complaint',      label: '😤  Complaint',        color: '#F5B800' },
-  { id: 'road_hazard',    label: '⚠️  Road Hazard',      color: '#F5B800' },
-  { id: 'vehicle_damage', label: '🔧  Vehicle Damage',   color: '#F09595' },
-  { id: 'other',          label: '📝  Other',            color: '#5DCAA5' },
+  { id: 'accident',       labelKey: 'incidentAccident',      color: '#F09595' },
+  { id: 'complaint',      labelKey: 'incidentComplaint',     color: '#F5B800' },
+  { id: 'road_hazard',    labelKey: 'incidentRoadHazard',    color: '#F5B800' },
+  { id: 'vehicle_damage', labelKey: 'incidentVehicleDamage', color: '#F09595' },
+  { id: 'other',          labelKey: 'incidentOther',         color: '#5DCAA5' },
 ];
 
 const SEVERITIES = [
-  { id: 'low',      label: 'Low',      color: '#5DCAA5' },
-  { id: 'medium',   label: 'Medium',   color: '#F5B800' },
-  { id: 'high',     label: 'High',     color: '#F09595' },
-  { id: 'critical', label: 'Critical', color: '#FF003E' },
+  { id: 'low',      labelKey: 'severityLow',      color: '#5DCAA5' },
+  { id: 'medium',   labelKey: 'severityMedium',   color: '#F5B800' },
+  { id: 'high',     labelKey: 'severityHigh',     color: '#F09595' },
+  { id: 'critical', labelKey: 'severityCritical', color: '#FF003E' },
 ];
 
 function dbToLevel(db) {
@@ -98,7 +98,7 @@ const waveStyles = StyleSheet.create({
   playhead:  { width: 13, height: 13, borderRadius: 7, position: 'absolute', top: '50%', marginTop: -6 },
 });
 
-function ChipSelector({ options, selected, onSelect, colors }) {
+function ChipSelector({ options, selected, onSelect, colors, t }) {
   return (
     <View style={chipStyles.row}>
       {options.map(o => (
@@ -114,7 +114,7 @@ function ChipSelector({ options, selected, onSelect, colors }) {
           ]}
         >
           <Text style={[chipStyles.label, { color: selected === o.id ? o.color : colors.textMuted }]}>
-            {o.label}
+            {t(o.labelKey)}
           </Text>
         </TouchableOpacity>
       ))}
@@ -179,7 +179,7 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
   async function startRecording() {
     try {
       const { granted } = await requestRecordingPermissionsAsync();
-      if (!granted) { Alert.alert('Microphone Access', 'Please allow microphone access.'); return; }
+      if (!granted) { Alert.alert(t('microphoneAccess'), t('microphoneAccessMsg')); return; }
 
       await setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
 
@@ -267,7 +267,7 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
   }
 
   async function handleSend() {
-    if (!recordingUri) { Alert.alert('Voice Required', 'Please record a voice message before submitting.'); return; }
+    if (!recordingUri) { Alert.alert(t('voiceRequired'), t('voiceRequiredMsg')); return; }
     setIsSending(true);
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     let succeeded = false;
@@ -298,7 +298,7 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
       console.log(`[ReportIssue] Report submitted — type: ${incidentType}, severity: ${severity}, file: ${fileName}`);
     } catch (e) {
       console.warn('[ReportIssue] upload:', e.message);
-      Alert.alert('Error', 'Failed to submit report. Please try again.');
+      Alert.alert(t('error'), t('reportSubmitError'));
     } finally {
       setIsSending(false);
       // Only auto-close on success — failed uploads stay open so the driver can retry
@@ -321,7 +321,7 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
     ]).start(() => { resetForm(); onClose(); });
   }
 
-  const accentColor = INCIDENT_TYPES.find(t => t.id === incidentType)?.color ?? colors.yellow;
+  const accentColor = INCIDENT_TYPES.find(item => item.id === incidentType)?.color ?? colors.yellow;
 
   return (
     <Modal transparent visible={visible} animationType="none" statusBarTranslucent onRequestClose={close}>
@@ -347,23 +347,23 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
                 </TouchableOpacity>
               </View>
 
-              <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>TITLE (optional)</Text>
+              <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>{t('incidentTitleLabel')}</Text>
               <TextInput
                 style={[styles.titleInput, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.bgCard }]}
                 value={title}
                 onChangeText={setTitle}
-                placeholder="Brief description of the incident…"
+                placeholder={t('incidentTitlePlaceholder')}
                 placeholderTextColor={colors.textDisabled}
                 maxLength={100}
               />
 
-              <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>INCIDENT TYPE</Text>
-              <ChipSelector options={INCIDENT_TYPES} selected={incidentType} onSelect={setIncidentType} colors={colors} />
+              <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>{t('incidentTypeLabel')}</Text>
+              <ChipSelector options={INCIDENT_TYPES} selected={incidentType} onSelect={setIncidentType} colors={colors} t={t} />
 
-              <Text style={[styles.fieldLabel, { color: colors.textMuted, marginTop: 16 }]}>SEVERITY</Text>
-              <ChipSelector options={SEVERITIES} selected={severity} onSelect={setSeverity} colors={colors} />
+              <Text style={[styles.fieldLabel, { color: colors.textMuted, marginTop: 16 }]}>{t('incidentSeverityLabel')}</Text>
+              <ChipSelector options={SEVERITIES} selected={severity} onSelect={setSeverity} colors={colors} t={t} />
 
-              <Text style={[styles.fieldLabel, { color: colors.textMuted, marginTop: 16 }]}>VOICE MESSAGE</Text>
+              <Text style={[styles.fieldLabel, { color: colors.textMuted, marginTop: 16 }]}>{t('incidentVoiceLabel')}</Text>
               <View style={[styles.waveContainer, {
                 backgroundColor: isRecording ? `${colors.red}12` : recordingUri ? `${accentColor}12` : colors.bgCard,
                 borderColor:     isRecording ? `${colors.red}40` : recordingUri ? `${accentColor}40` : colors.border,
@@ -392,7 +392,7 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
                   {isRecording
                     ? t('recordingLabel')
                     : isPlaying
-                    ? '▶  Playing…'
+                    ? t('playingLabel')
                     : recordingUri ? t('recordedLabel') : ''}
                 </Text>
               </View>
@@ -405,7 +405,7 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
                     style={[styles.recordBtn, { backgroundColor: isRecording ? colors.red : colors.yellow, shadowColor: isRecording ? colors.red : colors.yellow }]}
                   >
                     <Text style={styles.recordBtnIcon}>{isRecording ? '⏹' : '🎙'}</Text>
-                    <Text style={styles.recordBtnText}>{isRecording ? 'Tap to Stop' : 'Tap to Record'}</Text>
+                    <Text style={styles.recordBtnText}>{isRecording ? t('tapToStop') : t('tapToRecord')}</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -429,7 +429,7 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
                   <TouchableOpacity onPress={handleSend} activeOpacity={0.85} disabled={isSending}
                     style={[styles.sendBtn, { backgroundColor: isSending ? colors.border : accentColor }]}>
                     <Text style={[styles.sendBtnText, { color: isSending ? colors.textMuted : '#000' }]}>
-                      {isSending ? 'Sending…' : t('sendVoiceReport')}
+                      {isSending ? t('sending') : t('sendVoiceReport')}
                     </Text>
                   </TouchableOpacity>
                 </>

@@ -13,50 +13,10 @@ import { FONTS, RADIUS } from '../theme';
 const SUPPORT_PHONE    = '+96178999240';
 const WHATSAPP_NUMBER  = '+96178999240';
 
-const FAQS = [
-  {
-    q: 'How do I start receiving trips?',
-    a: 'Tap "Start Shift" on the home screen. You will go online and start receiving trip requests immediately.',
-  },
-  {
-    q: 'How do I accept a trip?',
-    a: 'When a trip request appears, tap "✓ Accept Trip" within 84 seconds. If you don\'t respond in time, the request expires automatically.',
-  },
-  {
-    q: 'What do I do if the customer doesn\'t show up?',
-    a: 'Tap the "No Show" button on the active trip screen, then confirm. The trip will be marked accordingly and you will return to scanning.',
-  },
-  {
-    q: 'How do I cancel a trip?',
-    a: 'Use the "Cancel Trip" link at the bottom of the active trip screen. Only use this in emergency situations — the dispatcher will be notified.',
-  },
-  {
-    q: 'How do I collect payment?',
-    a: 'When you arrive at the drop-off, tap "End Trip & Collect Payment" and select the payment method: Cash, Card, Wish, Wallet, or Account.',
-  },
-  {
-    q: 'I ended my shift by mistake. What do I do?',
-    a: 'When the shift summary appears, tap "Continue Working" to resume your shift. Your GPS and trip queue will continue as normal.',
-  },
-  {
-    q: 'How do I report an incident?',
-    a: 'Go to Account → Report an Issue. Record a short voice message describing the incident and tap Send. The operations team will follow up.',
-  },
-  {
-    q: 'How do I change my PIN?',
-    a: 'Go to Account → Change PIN, enter your new PIN twice, and tap Save. Your PIN must be 4 to 6 digits.',
-  },
-  {
-    q: 'The app is not responding. What do I do?',
-    a: 'Close the app completely and reopen it. If the problem continues, call the dispatcher directly using the button above.',
-  },
-  {
-    q: 'My GPS is not working. What do I do?',
-    a: 'Make sure location permissions are enabled for this app in your phone\'s Settings. Then end and restart your shift.',
-  },
-];
+const FAQ_KEYS = [1,2,3,4,5,6,7,8,9,10];
 
-function FaqItem({ item, colors }) {
+function FaqItem({ qKey, aKey, colors }) {
+  const { t }           = useLanguage();
   const [open, setOpen] = useState(false);
 
   return (
@@ -66,11 +26,11 @@ function FaqItem({ item, colors }) {
       style={[styles.faqItem, { borderBottomColor: colors.border }]}
     >
       <View style={styles.faqRow}>
-        <Text style={[styles.faqQ, { color: colors.textPrimary, flex: 1 }]}>{item.q}</Text>
+        <Text style={[styles.faqQ, { color: colors.textPrimary, flex: 1 }]}>{t(qKey)}</Text>
         <Text style={[styles.faqChevron, { color: colors.yellow }]}>{open ? '▾' : '›'}</Text>
       </View>
       {open && (
-        <Text style={[styles.faqA, { color: colors.textSecondary }]}>{item.a}</Text>
+        <Text style={[styles.faqA, { color: colors.textSecondary }]}>{t(aKey)}</Text>
       )}
     </TouchableOpacity>
   );
@@ -106,7 +66,7 @@ export default function HelpSupportModal({ visible, onClose }) {
     const url = `tel:${SUPPORT_PHONE}`;
     const can = await Linking.canOpenURL(url);
     if (can) Linking.openURL(url);
-    else Alert.alert('Call Support', SUPPORT_PHONE);
+    else Alert.alert(t('callSupport'), SUPPORT_PHONE);
   }
 
   async function handleWhatsApp() {
@@ -131,8 +91,8 @@ export default function HelpSupportModal({ visible, onClose }) {
 
           <View style={styles.header}>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.title, { color: colors.textPrimary }]}>Help & Support</Text>
-              <Text style={[styles.titleSub, { color: colors.textMuted }]}>Contact us or find answers below</Text>
+              <Text style={[styles.title, { color: colors.textPrimary }]}>{t('helpSupport')}</Text>
+              <Text style={[styles.titleSub, { color: colors.textMuted }]}>{t('helpSupportSubModal')}</Text>
             </View>
             <TouchableOpacity onPress={close} style={[styles.closeBtn, { backgroundColor: colors.bgCard }]}>
               <Text style={[styles.closeBtnText, { color: colors.textMuted }]}>✕</Text>
@@ -147,7 +107,7 @@ export default function HelpSupportModal({ visible, onClose }) {
               style={[styles.contactBtn, { backgroundColor: `${colors.green}15`, borderColor: `${colors.green}40` }]}
             >
               <Text style={styles.contactIcon}>📞</Text>
-              <Text style={[styles.contactLabel, { color: colors.green }]}>Call Support</Text>
+              <Text style={[styles.contactLabel, { color: colors.green }]}>{t('callSupport')}</Text>
               <Text style={[styles.contactSub, { color: colors.textMuted }]}>{SUPPORT_PHONE}</Text>
             </TouchableOpacity>
 
@@ -162,14 +122,15 @@ export default function HelpSupportModal({ visible, onClose }) {
             </TouchableOpacity>
           </View>
 
-          <Text style={[styles.faqHeading, { color: colors.textMuted }]}>FREQUENTLY ASKED QUESTIONS</Text>
+          <Text style={[styles.faqHeading, { color: colors.textMuted }]}>{t('faqHeading')}</Text>
 
           <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
             <View style={[styles.faqCard, { backgroundColor: colors.bgCard, borderColor: colors.border }, !isDark && styles.shadow]}>
-              {FAQS.map((item, i) => (
+              {FAQ_KEYS.map(n => (
                 <FaqItem
-                  key={i}
-                  item={item}
+                  key={n}
+                  qKey={`faq${n}q`}
+                  aKey={`faq${n}a`}
                   colors={colors}
                 />
               ))}

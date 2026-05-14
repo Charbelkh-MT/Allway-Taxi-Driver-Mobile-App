@@ -11,6 +11,17 @@ import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 import { FONTS, RADIUS } from '../theme';
 
+function mapLoginError(message, t) {
+  const msg = (message ?? '').toLowerCase();
+  if (msg.includes('invalid') || msg.includes('credentials') || msg.includes('password') || msg.includes('not found'))
+    return t('loginWrongCredentials');
+  if (msg.includes('too many') || msg.includes('rate limit') || msg.includes('quota'))
+    return t('loginTooManyAttempts');
+  if (msg.includes('network') || msg.includes('fetch') || msg.includes('connect'))
+    return t('loginNetworkError');
+  return t('loginFailed');
+}
+
 export default function LoginScreen() {
   const { login }            = useAuth();
   const { colors }           = useTheme();
@@ -60,7 +71,7 @@ export default function LoginScreen() {
         Animated.spring(overlayScale,   { toValue: 1, tension: 80, friction: 8, useNativeDriver: true }),
       ]).start();
     } catch (e) {
-      setError(e.message || 'Login failed.');
+      setError(mapLoginError(e.message, t));
       triggerShake();
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setLoading(false);

@@ -21,28 +21,39 @@ export function AuthProvider({ children }) {
   const [isLoading, setIsLoading]             = useState(true);
   const [driver, setDriver]                   = useState(FALLBACK_DRIVER);
 
-  const isDemoRef         = useRef(false);
-  const profileChannelRef = useRef(null);
+  const isDemoRef           = useRef(false);
+  const profileChannelRef   = useRef(null);
+  // Supabase fires SIGNED_OUT immediately when the listener registers (before reading
+  // AsyncStorage), which would flash the login screen on every cold start. This flag
+  // blocks the SIGNED_OUT handler until getSession() has confirmed the real state.
+  const sessionRestoredRef  = useRef(false);
 
   useEffect(() => {
-    // Force past the loading screen if auth init stalls beyond 10s
     const safetyTimer = setTimeout(() => {
+      sessionRestoredRef.current = true;
       setIsLoading(prev => { if (prev) { console.warn('[Auth] Loading timeout — forcing past loading screen'); } return false; });
     }, 10000);
 
     supabase.auth.getSession().then(({ data: { session } }) => {
+      sessionRestoredRef.current = true;
       if (session?.user) fetchDriverProfile(session.user.id);
       else { clearTimeout(safetyTimer); setIsLoading(false); }
-    }).catch(() => { clearTimeout(safetyTimer); setIsLoading(false); });
+    }).catch(() => {
+      sessionRestoredRef.current = true;
+      clearTimeout(safetyTimer);
+      setIsLoading(false);
+    });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (isDemoRef.current) return;
       if (session?.user) {
-        // INITIAL_SESSION already handled by getSession() above — only react to explicit sign-in/refresh
+        // INITIAL_SESSION already handled by getSession() — only react to explicit sign-in/refresh
         if (_event === 'SIGNED_IN' || _event === 'TOKEN_REFRESHED') {
           fetchDriverProfile(session.user.id);
         }
       } else if (_event === 'SIGNED_OUT') {
+        // Ignore the spurious SIGNED_OUT that fires before AsyncStorage is read on cold start
+        if (!sessionRestoredRef.current) return;
         clearTimeout(safetyTimer);
         unsubscribeProfile();
         setDriver(FALLBACK_DRIVER);

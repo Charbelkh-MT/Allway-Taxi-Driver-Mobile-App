@@ -98,14 +98,14 @@ export default function TripRequestSheet({ trip, onAccept, onDecline, withSound 
               />
               <View style={styles.headerCenter}>
                 <View style={styles.headerTitleRow}>
-                  <Text style={[styles.headerTitle, { color: colors.yellow }]}>NEW TRIP</Text>
+                  <Text style={[styles.headerTitle, { color: colors.yellow }]}>{t('newTrip')}</Text>
                   {trip.rideType === 'xl' && (
                     <View style={[styles.rideTypeBadge, { backgroundColor: `${colors.yellow}22`, borderColor: `${colors.yellow}60` }]}>
                       <Text style={[styles.rideTypeText, { color: colors.yellow }]}>XL</Text>
                     </View>
                   )}
                 </View>
-                <Text style={[styles.headerSub, { color: colors.textMuted }]}>Request incoming</Text>
+                <Text style={[styles.headerSub, { color: colors.textMuted }]}>{t('requestIncoming')}</Text>
               </View>
               <View style={[styles.countdownBadge, { backgroundColor: `${barColor}18`, borderColor: `${barColor}55` }]}>
                 <Text style={[styles.countdownNum, { color: barColor }]}>{countdown}</Text>

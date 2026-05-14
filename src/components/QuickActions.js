@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Linking, Alert } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 import { FONTS, RADIUS } from '../theme';
 import ReportIssueModal from './ReportIssueModal';
 
@@ -9,6 +10,7 @@ const SUPPORT_PHONE = '+96178999240';
 
 export default function QuickActions() {
   const { colors } = useTheme();
+  const { t } = useLanguage();
   const [showReport, setShowReport] = useState(false);
 
   async function handleCallSupport() {
@@ -18,7 +20,7 @@ export default function QuickActions() {
     if (canCall) {
       await Linking.openURL(url);
     } else {
-      Alert.alert('Call Support', `${SUPPORT_PHONE}\n\nTap to call the operations team.`);
+      Alert.alert(t('callSupport'), SUPPORT_PHONE);
     }
   }
 
@@ -29,15 +31,15 @@ export default function QuickActions() {
 
   const ACTIONS = [
     {
-      label:     'Call Support',
-      sub:       '24/7 helpline',
+      label:     t('callSupport'),
+      sub:       t('callSupportSub'),
       icon:      '📞',
       accentKey: 'green',
       onPress:   handleCallSupport,
     },
     {
-      label:     'Report Issue',
-      sub:       'Send a voice message',
+      label:     t('reportIssue'),
+      sub:       t('reportIssueSub'),
       icon:      '🚨',
       accentKey: 'red',
       onPress:   handleReportIssue,
@@ -46,7 +48,7 @@ export default function QuickActions() {
 
   return (
     <View style={styles.container}>
-      <Text style={[styles.heading, { color: colors.textMuted }]}>QUICK ACTIONS</Text>
+      <Text style={[styles.heading, { color: colors.textMuted }]}>{t('quickActions')}</Text>
       <View style={styles.grid}>
         {ACTIONS.map(action => {
           const accent = colors[action.accentKey];

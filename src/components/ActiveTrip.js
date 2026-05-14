@@ -20,8 +20,8 @@ function formatPaymentLabel(method) {
 }
 
 function TripSuccessOverlay({ visible, trip, paymentMethod, onDone }) {
-  const { colors } = useTheme();
-  const { t }      = useLanguage();
+  const { colors }   = useTheme();
+  const { t }        = useLanguage();
   const scaleAnim   = useRef(new Animated.Value(0.75)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const checkAnim   = useRef(new Animated.Value(0)).current;
@@ -86,7 +86,7 @@ function TripSuccessOverlay({ visible, trip, paymentMethod, onDone }) {
             activeOpacity={0.85}
             style={[successStyles.doneBtn, { backgroundColor: colors.yellow }]}
           >
-            <Text style={successStyles.doneBtnText}>OK — Back to Home</Text>
+            <Text style={successStyles.doneBtnText}>{t('okBackHome')}</Text>
           </TouchableOpacity>
 
         </Animated.View>
@@ -97,6 +97,7 @@ function TripSuccessOverlay({ visible, trip, paymentMethod, onDone }) {
 
 function CustomerRatingModal({ visible, trip, onRate }) {
   const { colors } = useTheme();
+  const { t }      = useLanguage();
   const [selected, setSelected] = useState(0);
   const scaleAnim = useRef(new Animated.Value(0.85)).current;
   const fadeAnim  = useRef(new Animated.Value(0)).current;
@@ -114,7 +115,7 @@ function CustomerRatingModal({ visible, trip, onRate }) {
     <Modal transparent visible={visible} animationType="none" statusBarTranslucent>
       <View style={[ratingStyles.overlay, { backgroundColor: 'rgba(0,0,0,0.88)' }]}>
         <Animated.View style={[ratingStyles.card, { backgroundColor: colors.bg, transform: [{ scale: scaleAnim }], opacity: fadeAnim }]}>
-          <Text style={[ratingStyles.title, { color: colors.textPrimary }]}>Rate this customer</Text>
+          <Text style={[ratingStyles.title, { color: colors.textPrimary }]}>{t('rateCustomer')}</Text>
           <Text style={[ratingStyles.sub, { color: colors.textMuted }]}>{trip?.customerFull || trip?.customer}</Text>
 
           <View style={ratingStyles.stars}>
@@ -131,7 +132,7 @@ function CustomerRatingModal({ visible, trip, onRate }) {
             style={[ratingStyles.btn, { backgroundColor: selected ? colors.yellow : colors.bgCard, borderColor: colors.border }]}
           >
             <Text style={[ratingStyles.btnText, { color: selected ? '#000' : colors.textMuted }]}>
-              {selected ? `Submit ${selected} ★` : 'Skip'}
+              {selected ? `${t('submitRating')} ${selected} ★` : t('skip')}
             </Text>
           </TouchableOpacity>
         </Animated.View>

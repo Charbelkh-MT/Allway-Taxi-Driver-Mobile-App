@@ -244,6 +244,84 @@ export const translations = {
     selectLanguageDesc:  'Choose your preferred language.',
     english:             '🇬🇧  English',
     arabic:              '🇱🇧  العربية (Arabic)',
+
+    // ── Login errors ─────────────────────────────────────────
+    loginFailed:           'Login failed. Please try again.',
+    loginWrongCredentials: 'Incorrect phone number or PIN.',
+    loginTooManyAttempts:  'Too many attempts. Please try again later.',
+    loginNetworkError:     'Connection error. Check your internet.',
+
+    // ── Scanning radar ────────────────────────────────────────
+    liveMatchingArea:      'Live matching in your area',
+
+    // ── Quick actions ─────────────────────────────────────────
+    callSupport:           'Call Support',
+    callSupportSub:        '24/7 helpline',
+
+    // ── Trip request sheet ────────────────────────────────────
+    newTrip:               'NEW TRIP',
+    requestIncoming:       'Request incoming',
+
+    // ── Trip completed / rating ───────────────────────────────
+    okBackHome:            'OK — Back to Home',
+    rateCustomer:          'Rate this customer',
+    skip:                  'Skip',
+    submitRating:          'Submit',
+
+    // ── Available trips sheet ─────────────────────────────────
+    availableTrips:        'Available Trips',
+    swipeToBrowse:         'swipe to browse',
+    passenger:             'Passenger',
+
+    // ── Help & Support modal ──────────────────────────────────
+    helpSupportSubModal:   'Contact us or find answers below',
+    faqHeading:            'FREQUENTLY ASKED QUESTIONS',
+    faq1q:  'How do I start receiving trips?',
+    faq1a:  'Tap "Start Shift" on the home screen. You will go online and start receiving trip requests immediately.',
+    faq2q:  'How do I accept a trip?',
+    faq2a:  'When a trip request appears, tap "✓ Accept Trip" within 84 seconds. If you don\'t respond in time, the request expires automatically.',
+    faq3q:  'What do I do if the customer doesn\'t show up?',
+    faq3a:  'Tap the "No Show" button on the active trip screen, then confirm. The trip will be marked accordingly and you will return to scanning.',
+    faq4q:  'How do I cancel a trip?',
+    faq4a:  'Use the "Cancel Trip" link at the bottom of the active trip screen. Only use this in emergency situations — the dispatcher will be notified.',
+    faq5q:  'How do I collect payment?',
+    faq5a:  'When you arrive at the drop-off, tap "End Trip & Collect Payment" and select the payment method: Cash, Card, Wish, Wallet, or Account.',
+    faq6q:  'I ended my shift by mistake. What do I do?',
+    faq6a:  'When the shift summary appears, tap "Continue Working" to resume your shift. Your GPS and trip queue will continue as normal.',
+    faq7q:  'How do I report an incident?',
+    faq7a:  'Go to Account → Report an Issue. Record a short voice message describing the incident and tap Send. The operations team will follow up.',
+    faq8q:  'How do I change my PIN?',
+    faq8a:  'Go to Account → Change PIN, enter your new PIN twice, and tap Save. Your PIN must be 4 to 6 digits.',
+    faq9q:  'The app is not responding. What do I do?',
+    faq9a:  'Close the app completely and reopen it. If the problem continues, call the dispatcher directly using the button above.',
+    faq10q: 'My GPS is not working. What do I do?',
+    faq10a: 'Make sure location permissions are enabled for this app in your phone\'s Settings. Then end and restart your shift.',
+
+    // ── Report issue modal ────────────────────────────────────
+    incidentTitleLabel:       'TITLE (optional)',
+    incidentTitlePlaceholder: 'Brief description of the incident…',
+    incidentTypeLabel:        'INCIDENT TYPE',
+    incidentSeverityLabel:    'SEVERITY',
+    incidentVoiceLabel:       'VOICE MESSAGE',
+    tapToRecord:              'Tap to Record',
+    tapToStop:                'Tap to Stop',
+    playingLabel:             '▶  Playing…',
+    voiceRequired:            'Voice Required',
+    voiceRequiredMsg:         'Please record a voice message before submitting.',
+    microphoneAccess:         'Microphone Access',
+    microphoneAccessMsg:      'Please allow microphone access.',
+    error:                    'Error',
+    reportSubmitError:        'Failed to submit report. Please try again.',
+    sending:                  'Sending…',
+    incidentAccident:         '🚗  Accident',
+    incidentComplaint:        '😤  Complaint',
+    incidentRoadHazard:       '⚠️  Road Hazard',
+    incidentVehicleDamage:    '🔧  Vehicle Damage',
+    incidentOther:            '📝  Other',
+    severityLow:              'Low',
+    severityMedium:           'Medium',
+    severityHigh:             'High',
+    severityCritical:         'Critical',
   },
 
   ar: {
@@ -491,5 +569,83 @@ export const translations = {
     selectLanguageDesc:  'اختر لغتك المفضلة.',
     english:             '🇬🇧  English',
     arabic:              '🇱🇧  العربية',
+
+    // ── Login errors ─────────────────────────────────────────
+    loginFailed:           'فشل تسجيل الدخول. حاول مجدداً.',
+    loginWrongCredentials: 'رقم الهاتف أو الرقم السري غير صحيح.',
+    loginTooManyAttempts:  'محاولات كثيرة. حاول لاحقاً.',
+    loginNetworkError:     'خطأ في الاتصال. تحقق من الإنترنت.',
+
+    // ── Scanning radar ────────────────────────────────────────
+    liveMatchingArea:      'البحث المباشر في منطقتك',
+
+    // ── Quick actions ─────────────────────────────────────────
+    callSupport:           'الدعم الفني',
+    callSupportSub:        'خط مساعدة ٢٤/٧',
+
+    // ── Trip request sheet ────────────────────────────────────
+    newTrip:               'رحلة جديدة',
+    requestIncoming:       'طلب وارد',
+
+    // ── Trip completed / rating ───────────────────────────────
+    okBackHome:            'موافق — الرئيسية',
+    rateCustomer:          'تقييم الزبون',
+    skip:                  'تخطي',
+    submitRating:          'إرسال',
+
+    // ── Available trips sheet ─────────────────────────────────
+    availableTrips:        'الرحلات المتاحة',
+    swipeToBrowse:         'مرّر للتصفح',
+    passenger:             'راكب',
+
+    // ── Help & Support modal ──────────────────────────────────
+    helpSupportSubModal:   'تواصل معنا أو ابحث عن إجابات',
+    faqHeading:            'الأسئلة الشائعة',
+    faq1q:  'كيف أبدأ باستقبال الرحلات؟',
+    faq1a:  'اضغط على "بدء المناوبة" في الشاشة الرئيسية. ستصبح متصلاً وتبدأ فوراً باستقبال طلبات الرحلات.',
+    faq2q:  'كيف أقبل رحلة؟',
+    faq2a:  'عند ظهور طلب رحلة، اضغط على "✓ قبول الرحلة" خلال ٨٤ ثانية. إذا لم تستجب، ينتهي الطلب تلقائياً.',
+    faq3q:  'ماذا أفعل إذا لم يظهر الزبون؟',
+    faq3a:  'اضغط على "لم يظهر" في شاشة الرحلة النشطة ثم أكّد. ستعود إلى وضع البحث.',
+    faq4q:  'كيف أُلغي رحلة؟',
+    faq4a:  'استخدم "إلغاء الرحلة" في أسفل شاشة الرحلة النشطة. في حالات الطوارئ فقط — سيُبلَّغ المرسل.',
+    faq5q:  'كيف أحصّل الدفع؟',
+    faq5a:  'عند وصولك لنقطة التوصيل، اضغط "إنهاء الرحلة وتحصيل الدفع" واختر الطريقة: نقداً، بطاقة، Wish، محفظة، أو حساب.',
+    faq6q:  'أنهيت مناوبتي بالخطأ. ماذا أفعل؟',
+    faq6a:  'عند ظهور ملخص المناوبة، اضغط "متابعة العمل". سيستمر GPS وقائمة الرحلات بشكل طبيعي.',
+    faq7q:  'كيف أبلّغ عن حادثة؟',
+    faq7a:  'انتقل إلى الحساب ← الإبلاغ عن مشكلة. سجّل رسالة صوتية وأرسلها. سيتابع معك فريق العمليات.',
+    faq8q:  'كيف أغيّر رقمي السري؟',
+    faq8a:  'انتقل إلى الحساب ← تغيير الرقم السري، أدخله مرتين وأضغط حفظ. يجب أن يتكون من ٤ إلى ٦ أرقام.',
+    faq9q:  'التطبيق لا يستجيب. ماذا أفعل؟',
+    faq9a:  'أغلق التطبيق بالكامل وأعد فتحه. إذا استمرت المشكلة، اتصل بالمرسل مباشرةً.',
+    faq10q: 'GPS لا يعمل. ماذا أفعل؟',
+    faq10a: 'تأكد من تفعيل صلاحيات الموقع لهذا التطبيق في إعدادات هاتفك، ثم أعد تشغيل مناوبتك.',
+
+    // ── Report issue modal ────────────────────────────────────
+    incidentTitleLabel:       'العنوان (اختياري)',
+    incidentTitlePlaceholder: 'وصف مختصر للحادثة…',
+    incidentTypeLabel:        'نوع الحادثة',
+    incidentSeverityLabel:    'الخطورة',
+    incidentVoiceLabel:       'الرسالة الصوتية',
+    tapToRecord:              'اضغط للتسجيل',
+    tapToStop:                'اضغط للإيقاف',
+    playingLabel:             '▶  جارٍ التشغيل…',
+    voiceRequired:            'رسالة صوتية مطلوبة',
+    voiceRequiredMsg:         'يرجى تسجيل رسالة صوتية قبل الإرسال.',
+    microphoneAccess:         'صلاحية الميكروفون',
+    microphoneAccessMsg:      'يرجى السماح بالوصول إلى الميكروفون.',
+    error:                    'خطأ',
+    reportSubmitError:        'فشل إرسال التقرير. حاول مجدداً.',
+    sending:                  'جارٍ الإرسال…',
+    incidentAccident:         '🚗  حادث سير',
+    incidentComplaint:        '😤  شكوى',
+    incidentRoadHazard:       '⚠️  خطر على الطريق',
+    incidentVehicleDamage:    '🔧  ضرر في المركبة',
+    incidentOther:            '📝  أخرى',
+    severityLow:              'منخفض',
+    severityMedium:           'متوسط',
+    severityHigh:             'مرتفع',
+    severityCritical:         'حرج',
   },
 };
