@@ -150,7 +150,9 @@ async function startForegroundTracking(cachedUserId) {
             { onConflict: 'driver_id' }
           ),
         ];
-        if (gpsTick % 15 === 0) {
+        // Update drivers on first ping and every 15 ticks (~30s) so the CRM map
+        // reflects position immediately when the driver goes online.
+        if (gpsTick === 1 || gpsTick % 15 === 0) {
           ops.push(
             supabase.from(TABLE_DRIVERS)
               .update({ lat, lng, last_seen: now, heading, speed })

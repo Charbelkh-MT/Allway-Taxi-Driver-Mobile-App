@@ -28,28 +28,45 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
   const now     = new Date().toISOString();
   bgTick++;
 
-  console.log(`[GPS] lat=${lat.toFixed(6)}  lng=${lng.toFixed(6)}  heading=${heading.toFixed(1)}°  speed=${speed.toFixed(1)}m/s`);
+  console.log(`[GPS BG] lat=${lat.toFixed(6)}  lng=${lng.toFixed(6)}  heading=${heading.toFixed(1)}°  speed=${speed.toFixed(1)}m/s  tick=${bgTick}`);
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
+  // getSession() reads from AsyncStorage — no network call, reliable in background.
+  // getUser() makes a network request which can silently fail/time-out when backgrounded.
+  let userId;
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    userId = session?.user?.id;
+  } catch (e) {
+    console.warn('[GPS BG] getSession error:', e.message);
+    return;
+  }
+  if (!userId) {
+    console.warn('[GPS BG] No active session — skipping write');
+    return;
+  }
 
   const ops = [
     supabase.from(TABLE_LOCATIONS).upsert(
-      { driver_id: user.id, lat, lng, heading, speed, is_online: true, updated_at: now },
+      { driver_id: userId, lat, lng, heading, speed, is_online: true, updated_at: now },
       { onConflict: 'driver_id' }
     ),
   ];
 
-  // Mirror the foreground watcher: update drivers every 30 ticks (~60s) to keep CRM map current
-  if (bgTick % 15 === 0) {
+  // Update drivers on the very first ping and every 15 ticks (~30s) so the CRM
+  // map stays current immediately after task startup or restart.
+  if (bgTick === 1 || bgTick % 15 === 0) {
     ops.push(
       supabase.from(TABLE_DRIVERS)
         .update({ lat, lng, last_seen: now, heading, speed })
-        .eq(DRIVER_COLS.id, user.id)
+        .eq(DRIVER_COLS.id, userId)
     );
   }
 
-  await Promise.all(ops);
+  try {
+    await Promise.all(ops);
+  } catch (e) {
+    console.warn('[GPS BG] DB write error:', e.message);
+  }
 });
 
 export async function startLocationTracking() {
@@ -101,18 +118,16 @@ export async function stopLocationTracking() {
     }
 
     // Mark driver offline so the CRM map reflects the correct status
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
+    const { data: { session } } = await supabase.auth.getSession();
+    const userId = session?.user?.id;
+    if (userId) {
       await supabase.from(TABLE_LOCATIONS).upsert(
-        {
-          driver_id:  user.id,
-          is_online:  false,
-          updated_at: new Date().toISOString(),
-        },
+        { driver_id: userId, is_online: false, updated_at: new Date().toISOString() },
         { onConflict: 'driver_id' }
       );
     }
-    console.log('[GPS] Tracking stopped');
+    bgTick = 0;
+    console.log('[GPS] Background tracking stopped');
   } catch (e) {
     console.warn('[GPS] Stop error:', e.message);
   }
