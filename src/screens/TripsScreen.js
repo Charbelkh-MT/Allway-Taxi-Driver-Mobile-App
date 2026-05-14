@@ -102,7 +102,9 @@ export default function TripsScreen() {
       });
       setTrips(mapped);
       setStats({ total: mapped.length, earned: totalEarned, completed: completedCount });
-    } catch {} finally {
+    } catch (e) {
+      console.warn('[TripsScreen] fetchTrips error:', e.message);
+    } finally {
       setLoading(false); setRefreshing(false);
     }
   }, []);

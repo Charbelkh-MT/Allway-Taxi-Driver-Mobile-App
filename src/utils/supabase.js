@@ -11,3 +11,15 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     detectSessionInUrl: false,
   },
 });
+
+// Reads the locally-cached session from AsyncStorage — no network call.
+// Safe to call from background tasks where network access may be restricted.
+// Returns the user's UUID string, or null if no active session.
+export async function getCurrentUserId() {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.user?.id ?? null;
+  } catch {
+    return null;
+  }
+}

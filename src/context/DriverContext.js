@@ -4,7 +4,7 @@ import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { supabase } from '../utils/supabase';
+import { supabase, getCurrentUserId } from '../utils/supabase';
 import { startLocationTracking, stopLocationTracking, LOCATION_TASK_NAME } from '../utils/locationTask';
 import { TABLE_SHIFTS, TABLE_LOCATIONS, TABLE_TRIPS, TABLE_DRIVERS, TRIP_COLS, DRIVER_COLS } from '../config';
 import { useAuth } from './AuthContext';
@@ -177,17 +177,16 @@ async function stopForegroundTracking() {
     console.log('[GPS] Foreground watch stopped');
   }
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
+    const userId = await getCurrentUserId();
+    if (userId) {
       const now = new Date().toISOString();
       await supabase.from(TABLE_LOCATIONS).upsert(
-        { driver_id: user.id, is_online: false, updated_at: now },
+        { driver_id: userId, is_online: false, updated_at: now },
         { onConflict: 'driver_id' }
       );
-      // Mark offline in drivers table so the CRM map removes the marker
       await supabase.from(TABLE_DRIVERS)
         .update({ [DRIVER_COLS.online]: false, last_seen: now, [DRIVER_COLS.status]: 'offline' })
-        .eq(DRIVER_COLS.id, user.id);
+        .eq(DRIVER_COLS.id, userId);
     }
   } catch (e) { console.warn('[GPS] Offline mark error:', e.message); }
 }

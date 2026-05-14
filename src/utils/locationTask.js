@@ -7,12 +7,13 @@
 import * as TaskManager from 'expo-task-manager';
 import * as Location from 'expo-location';
 import { Platform } from 'react-native';
-import { supabase } from './supabase';
+import { supabase, getCurrentUserId } from './supabase';
 import { TABLE_LOCATIONS, TABLE_DRIVERS, DRIVER_COLS } from '../config';
 
 export const LOCATION_TASK_NAME = 'allway-background-location';
 
-let bgTick = 0;
+let bgTick      = 0;
+let cachedUserId = null; // fetched once per task session, avoids per-ping AsyncStorage reads
 
 TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
   if (error) {
@@ -30,35 +31,27 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
 
   console.log(`[GPS BG] lat=${lat.toFixed(6)}  lng=${lng.toFixed(6)}  heading=${heading.toFixed(1)}°  speed=${speed.toFixed(1)}m/s  tick=${bgTick}`);
 
-  // getSession() reads from AsyncStorage — no network call, reliable in background.
-  // getUser() makes a network request which can silently fail/time-out when backgrounded.
-  let userId;
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    userId = session?.user?.id;
-  } catch (e) {
-    console.warn('[GPS BG] getSession error:', e.message);
-    return;
+  // Fetch userId once on startup; retry every 30 ticks in case session loads late.
+  // Caching avoids 450 AsyncStorage reads/hour from per-ping getSession() calls.
+  if (!cachedUserId && (bgTick === 1 || bgTick % 30 === 0)) {
+    cachedUserId = await getCurrentUserId();
   }
-  if (!userId) {
-    console.warn('[GPS BG] No active session — skipping write');
-    return;
-  }
+  if (!cachedUserId) return;
 
   const ops = [
     supabase.from(TABLE_LOCATIONS).upsert(
-      { driver_id: userId, lat, lng, heading, speed, is_online: true, updated_at: now },
+      { driver_id: cachedUserId, lat, lng, heading, speed, is_online: true, updated_at: now },
       { onConflict: 'driver_id' }
     ),
   ];
 
-  // Update drivers on the very first ping and every 15 ticks (~30s) so the CRM
-  // map stays current immediately after task startup or restart.
+  // Update drivers on first ping and every 15 ticks (~30s) so the CRM map stays
+  // current immediately after task startup or restart.
   if (bgTick === 1 || bgTick % 15 === 0) {
     ops.push(
       supabase.from(TABLE_DRIVERS)
         .update({ lat, lng, last_seen: now, heading, speed })
-        .eq(DRIVER_COLS.id, userId)
+        .eq(DRIVER_COLS.id, cachedUserId)
     );
   }
 
@@ -118,15 +111,15 @@ export async function stopLocationTracking() {
     }
 
     // Mark driver offline so the CRM map reflects the correct status
-    const { data: { session } } = await supabase.auth.getSession();
-    const userId = session?.user?.id;
+    const userId = cachedUserId ?? await getCurrentUserId();
     if (userId) {
       await supabase.from(TABLE_LOCATIONS).upsert(
         { driver_id: userId, is_online: false, updated_at: new Date().toISOString() },
         { onConflict: 'driver_id' }
       );
     }
-    bgTick = 0;
+    bgTick       = 0;
+    cachedUserId = null;
     console.log('[GPS] Background tracking stopped');
   } catch (e) {
     console.warn('[GPS] Stop error:', e.message);
