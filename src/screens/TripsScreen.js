@@ -25,13 +25,15 @@ const FILTERS = [
 ];
 
 const STATUS_CONFIG = {
-  scheduled: { labelKey: 'filterScheduled',  accentKey: 'yellow', icon: '🕐' },
-  pending:   { labelKey: 'statusPending',    accentKey: 'yellow', icon: '⏳' },
-  accepted:  { labelKey: 'statusAccepted',   accentKey: 'yellow', icon: '🚕' },
-  picked_up: { labelKey: 'statusPickedUp',   accentKey: 'green',  icon: '🟢' },
-  completed: { labelKey: 'statusCompleted',  accentKey: 'green',  icon: '✓'  },
-  no_show:   { labelKey: 'statusNoShow',     accentKey: 'red',    icon: '👻' },
-  cancelled: { labelKey: 'statusCancelled',  accentKey: 'red',    icon: '✕'  },
+  scheduled:   { labelKey: 'filterScheduled',  accentKey: 'yellow', icon: '🕐' },
+  pending:     { labelKey: 'statusPending',    accentKey: 'yellow', icon: '⏳' },
+  dispatching: { labelKey: 'statusPending',    accentKey: 'yellow', icon: '📡' },
+  accepted:    { labelKey: 'statusAccepted',   accentKey: 'yellow', icon: '🚕' },
+  picked_up:   { labelKey: 'statusPickedUp',   accentKey: 'green',  icon: '🟢' },
+  on_trip:     { labelKey: 'statusPickedUp',   accentKey: 'green',  icon: '🚗' },
+  completed:   { labelKey: 'statusCompleted',  accentKey: 'green',  icon: '✓'  },
+  no_show:     { labelKey: 'statusNoShow',     accentKey: 'red',    icon: '👻' },
+  cancelled:   { labelKey: 'statusCancelled',  accentKey: 'red',    icon: '✕'  },
 };
 
 const Separator   = () => <View style={{ height: 10 }} />;

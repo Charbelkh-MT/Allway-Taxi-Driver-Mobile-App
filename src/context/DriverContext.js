@@ -425,6 +425,17 @@ export function DriverProvider({ children }) {
           const status   = row[TRIP_COLS.status];
           const driverId = row[TRIP_COLS.driverId];
 
+          // Scheduled trip assigned directly to this driver — add to upcoming list
+          if (status === 'scheduled' && driverId === userIdRef.current) {
+            const trip = normalizeTrip(row);
+            setScheduledTrips(prev =>
+              prev.find(t => t.id === trip.id)
+                ? prev
+                : [...prev, trip].sort((a, b) => new Date(a.scheduledFor) - new Date(b.scheduledFor))
+            );
+            return;
+          }
+
           if (status !== 'pending') return;
           // Skip trips pre-assigned to a different driver — but allow trips
           // where driver_id is null (open dispatch) OR set to this driver directly.
