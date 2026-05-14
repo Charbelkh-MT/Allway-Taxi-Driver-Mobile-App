@@ -20,9 +20,11 @@ const STATUS_CONFIG = {
 };
 
 const PAYMENT_CONFIG = {
-  cash: { icon: '💵', label: 'Cash'    },
-  card: { icon: '💳', label: 'Card'    },
-  debt: { icon: '📋', label: 'Account' },
+  cash:   { icon: '💵', label: 'Cash'    },
+  card:   { icon: '💳', label: 'Card'    },
+  debt:   { icon: '📋', label: 'Account' },
+  wish:   { icon: '💙', label: 'Whish'   },
+  wallet: { icon: '💰', label: 'Wallet'  },
 };
 
 export default function TripDetailModal({ trip, visible, onClose }) {
@@ -54,7 +56,9 @@ export default function TripDetailModal({ trip, visible, onClose }) {
   const cfgRaw   = STATUS_CONFIG[trip.status] || STATUS_CONFIG.completed;
   const cfg      = { ...cfgRaw, label: t(cfgRaw.labelKey) };
   const accent   = colors[cfg.color];
-  const pay      = PAYMENT_CONFIG[trip.paymentMethod];
+  const pay      = trip.paymentMethod?.startsWith('split|')
+    ? { icon: '🔀', label: 'Split' }
+    : PAYMENT_CONFIG[trip.paymentMethod];
 
   // Context-aware actions based on status
   const isAccepted   = trip.status === 'accepted';

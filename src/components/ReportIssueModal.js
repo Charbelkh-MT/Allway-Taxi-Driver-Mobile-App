@@ -270,6 +270,7 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
     if (!recordingUri) { Alert.alert('Voice Required', 'Please record a voice message before submitting.'); return; }
     setIsSending(true);
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    let succeeded = false;
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
@@ -292,6 +293,7 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
         submitted_by:  'driver',
       });
 
+      succeeded = true;
       setSent(true);
       console.log(`[ReportIssue] Report submitted — type: ${incidentType}, severity: ${severity}, file: ${fileName}`);
     } catch (e) {
@@ -299,7 +301,8 @@ export default function ReportIssueModal({ visible, onClose, activeTripId = null
       Alert.alert('Error', 'Failed to submit report. Please try again.');
     } finally {
       setIsSending(false);
-      if (!sent) { setTimeout(() => { setSent(false); resetForm(); close(); }, 3000); }
+      // Only auto-close on success — failed uploads stay open so the driver can retry
+      if (succeeded) { setTimeout(() => { setSent(false); resetForm(); close(); }, 3000); }
     }
   }
 

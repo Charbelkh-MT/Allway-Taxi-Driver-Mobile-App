@@ -2,16 +2,19 @@
 
 // Format seconds → MM:SS or HH:MM:SS (used for shift timer and trip timer)
 export function formatTime(s) {
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = s % 60;
+  const total = Math.max(0, Math.floor(Number(s) || 0));
+  const h   = Math.floor(total / 3600);
+  const m   = Math.floor((total % 3600) / 60);
+  const sec = total % 60;
   if (h > 0) return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
   return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
 }
 
 export function relativeTime(iso) {
   if (!iso) return '';
-  const diff  = Date.now() - new Date(iso).getTime();
+  const ts = new Date(iso).getTime();
+  if (isNaN(ts)) return '';
+  const diff  = Date.now() - ts;
   const mins  = Math.floor(diff / 60000);
   const hours = Math.floor(diff / 3600000);
   const days  = Math.floor(diff / 86400000);
@@ -49,7 +52,9 @@ export function sumFare(rows, fareCol) {
 // "in 2h 15min" / "in 45min" / "Starting now"
 export function timeUntil(iso) {
   if (!iso) return '';
-  const diffMs = new Date(iso).getTime() - Date.now();
+  const ts = new Date(iso).getTime();
+  if (isNaN(ts)) return '';
+  const diffMs = ts - Date.now();
   if (diffMs <= 0) return 'Starting now';
   const totalMin = Math.ceil(diffMs / 60000);
   if (totalMin < 60) return `in ${totalMin}min`;
