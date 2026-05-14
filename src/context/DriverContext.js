@@ -265,7 +265,7 @@ export function DriverProvider({ children }) {
         const saved = await AsyncStorage.getItem(SHIFT_STORAGE_KEY);
         if (!saved) return;
 
-        const { userId, shiftId, startTime } = JSON.parse(saved);
+        const { userId, shiftId, startTime, carType = 'comfort' } = JSON.parse(saved);
         if (!userId) return;
 
         const savedCash = await AsyncStorage.getItem(CASH_STORAGE_KEY);
@@ -275,12 +275,21 @@ export function DriverProvider({ children }) {
           setCashCollected(c);
         }
 
-        const isTracking = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME).catch(() => false);
+        // goOffline() always removes SHIFT_STORAGE_KEY, so if the key exists the app
+        // was killed mid-shift. Restore it regardless of environment (Expo Go or APK).
+        // Discard only if the shift is older than 16 hours — guards against restoring
+        // a stale shift after the phone was off overnight.
+        const shiftAgeHours = (Date.now() - startTime) / 3600000;
+        if (shiftAgeHours > 16) {
+          await AsyncStorage.removeItem(SHIFT_STORAGE_KEY);
+          console.log('[DriverContext] Stale shift discarded — age:', shiftAgeHours.toFixed(1), 'h');
+          return;
+        }
 
         userIdRef.current       = userId;
         currentShiftRef.current = shiftId ?? null;
         isDemoRef.current       = false;
-        startTimeRef.current    = startTime;
+        carTypeRef.current      = carType;
 
         const savedTrip = await AsyncStorage.getItem(ACTIVE_TRIP_STORAGE_KEY);
         if (savedTrip) {
@@ -296,6 +305,7 @@ export function DriverProvider({ children }) {
           const stillActive = tripStatus === 'accepted' || tripStatus === 'picked_up';
 
           if (stillActive) {
+            startTimeRef.current = startTime;
             const restoredTrip = { ...trip, status: tripStatus };
             activeTripIdRef.current = trip.id;
             setActiveTrip(restoredTrip);
@@ -304,9 +314,8 @@ export function DriverProvider({ children }) {
             await supabase.from(TABLE_DRIVERS)
               .update({ [DRIVER_COLS.online]: true, [DRIVER_COLS.status]: 'on_trip' })
               .eq(DRIVER_COLS.id, userId);
-            if (!isTracking) {
-              try { await startForegroundTracking(userId); } catch {}
-            }
+            try { await startForegroundTracking(userId); } catch {}
+            if (!IS_EXPO_GO) startLocationTracking().catch(() => {});
             console.log('[DriverContext] Active trip restored:', trip.id, '— status:', tripStatus);
             return;
           } else {
@@ -314,10 +323,14 @@ export function DriverProvider({ children }) {
           }
         }
 
-        if (!isTracking) {
-          // GPS stopped externally — clear the saved shift so we don't restore stale state
-          await AsyncStorage.removeItem(SHIFT_STORAGE_KEY);
-          return;
+        startTimeRef.current = startTime;
+
+        // Restart GPS — foreground for both environments, background only on native builds
+        try { await startForegroundTracking(userId); } catch {}
+        if (!IS_EXPO_GO) {
+          startLocationTracking().catch(e =>
+            console.warn('[DriverContext] Background task restore (non-fatal):', e.message)
+          );
         }
 
         setDriverState(DRIVER_STATE.SCANNING);
@@ -331,7 +344,8 @@ export function DriverProvider({ children }) {
           .from(TABLE_TRIPS)
           .select('*')
           .eq(TRIP_COLS.status, 'pending')
-          .is(TRIP_COLS.driverId, null);
+          .is(TRIP_COLS.driverId, null)
+          .eq(TRIP_COLS.rideType, carType);
         setAvailableTrips(markPreferred((data ?? []).map(normalizeTrip), userId));
 
         console.log('[DriverContext] Shift restored — elapsed:', Math.floor((Date.now() - startTime) / 1000), 's');
@@ -410,7 +424,11 @@ export function DriverProvider({ children }) {
           if (!row) return;
           const status   = row[TRIP_COLS.status];
           const driverId = row[TRIP_COLS.driverId];
-          if (status !== 'pending' || driverId) return;
+
+          if (status !== 'pending') return;
+          // Skip trips pre-assigned to a different driver — but allow trips
+          // where driver_id is null (open dispatch) OR set to this driver directly.
+          if (driverId && driverId !== userIdRef.current) return;
 
           const trip = normalizeTrip(row);
 
@@ -662,6 +680,7 @@ export function DriverProvider({ children }) {
         userId:    user.id,
         shiftId:   currentShiftRef.current,
         startTime: startTimeRef.current ?? Date.now(),
+        carType:   carTypeRef.current,
       }));
     } catch (e) { console.warn('[DriverContext] Shift save error:', e.message); }
 
