@@ -498,23 +498,28 @@ export function DriverProvider({ children }) {
           // Remove from upcoming list if trip was cancelled or modified
           if (driverId === userIdRef.current && status !== 'scheduled') {
             setScheduledTrips(prev => prev.filter(t => t.id !== row?.id));
+            await fetchScheduledTrips();
           }
 
           // Re-sync available queue when any trip leaves pending state
           if (status && status !== 'pending') await syncPendingTrips();
         }
       )
-      // DELETE — payload.old is unreliable; always re-sync
+      // DELETE — payload.old is unreliable; always re-sync both queues
       .on(
         'postgres_changes',
         { event: 'DELETE', schema: 'public', table: TABLE_TRIPS },
-        async () => { await syncPendingTrips(); }
+        async () => {
+          await syncPendingTrips();
+          await fetchScheduledTrips();
+        }
       )
       .subscribe((status) => {
         console.log('[Realtime] dispatch channel:', status);
         if (status === 'SUBSCRIBED') {
           console.log('[Realtime] ✅ Channel connected — listening for trips (carType:', carTypeRef.current, ')');
           syncPendingTrips();
+          fetchScheduledTrips();
         }
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           console.warn('[Realtime] ❌ Channel error — trips will not be received until reconnect');

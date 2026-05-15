@@ -18,6 +18,7 @@ import AvailableTripsSheet from '../components/AvailableTripsSheet';
 import ShiftSummaryModal from '../components/ShiftSummaryModal';
 import SosButton from '../components/SosButton';
 import UpcomingTrips from '../components/UpcomingTrips';
+import TripDetailModal from '../components/TripDetailModal';
 import { registerForPushNotificationsAsync } from '../utils/notifications';
 import { SkeletonChart } from '../components/Skeleton';
 import { supabase } from '../utils/supabase';
@@ -35,9 +36,10 @@ export default function HomeScreen() {
     pickUpPassenger, markNoShow, cancelTrip, openTripSheet,
   } = useDriver();
 
-  const [showAvailableSheet,  setShowAvailableSheet]  = useState(false);
-  const [showSummary,         setShowSummary]          = useState(false);
-  const [summaryData,         setSummaryData]          = useState(null);
+  const [showAvailableSheet,    setShowAvailableSheet]    = useState(false);
+  const [showSummary,           setShowSummary]            = useState(false);
+  const [summaryData,           setSummaryData]            = useState(null);
+  const [selectedScheduledTrip, setSelectedScheduledTrip] = useState(null);
   const [summaryLoading,      setSummaryLoading]       = useState(false);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
@@ -189,7 +191,22 @@ export default function HomeScreen() {
 
         {driverState === DRIVER_STATE.SCANNING && isOnline && scheduledTrips.length > 0 && (
           <FadeInView delay={180} distance={16}>
-            <UpcomingTrips trips={scheduledTrips} />
+            <UpcomingTrips
+              trips={scheduledTrips}
+              onPressTrip={trip => setSelectedScheduledTrip({
+                id:           trip.id,
+                name:         trip.customerFull && trip.customerFull !== 'Customer' ? trip.customerFull : '—',
+                phone:        trip.phone || '',
+                pickup:       trip.pickup || '',
+                dropoff:      trip.dropoff || '',
+                fare:         trip.fare || '',
+                dist:         trip.dist || '',
+                status:       'scheduled',
+                paymentMethod:'',
+                time:         '',
+                scheduledFor: trip.scheduledFor,
+              })}
+            />
           </FadeInView>
         )}
         {driverState === DRIVER_STATE.ACTIVE   && activeTrip && (
@@ -215,6 +232,12 @@ export default function HomeScreen() {
         shiftSeconds={shiftSeconds ?? 0}
         onConfirmEnd={(summary) => { setShowSummary(false); goOffline(summary); }}
         onResume={() => { setShowSummary(false); setSummaryData(null); }}
+      />
+
+      <TripDetailModal
+        trip={selectedScheduledTrip}
+        visible={!!selectedScheduledTrip}
+        onClose={() => setSelectedScheduledTrip(null)}
       />
 
       {showAvailableSheet && (
