@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
   Modal, Animated, ScrollView, ActivityIndicator,
@@ -33,11 +33,12 @@ export default function ShiftSummaryModal({ visible, summary, loading, shiftSeco
   const { t, isRTL }       = useLanguage();
   const insets             = useSafeAreaInsets();
 
-  const slideAnim = useRef(new Animated.Value(700)).current;
-  const fadeAnim  = useRef(new Animated.Value(0)).current;
+  const slideAnim    = useRef(new Animated.Value(700)).current;
+  const fadeAnim     = useRef(new Animated.Value(0)).current;
+  const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
-    if (!visible) return;
+    if (!visible) { setProcessing(false); return; }
     slideAnim.setValue(700);
     fadeAnim.setValue(0);
     Animated.parallel([
@@ -47,6 +48,8 @@ export default function ShiftSummaryModal({ visible, summary, loading, shiftSeco
   }, [visible]);
 
   async function handleConfirm() {
+    if (processing || loading) return;
+    setProcessing(true);
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     Animated.parallel([
       Animated.timing(slideAnim, { toValue: 700, duration: 250, useNativeDriver: true }),
@@ -55,6 +58,8 @@ export default function ShiftSummaryModal({ visible, summary, loading, shiftSeco
   }
 
   async function handleResume() {
+    if (processing) return;
+    setProcessing(true);
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     Animated.parallel([
       Animated.timing(slideAnim, { toValue: 700, duration: 250, useNativeDriver: true }),
@@ -65,9 +70,10 @@ export default function ShiftSummaryModal({ visible, summary, loading, shiftSeco
   const s = summary ?? {};
 
   return (
-    <Modal transparent visible={visible} animationType="none" statusBarTranslucent onRequestClose={handleResume}>
+    <Modal transparent visible={visible} animationType="none" statusBarTranslucent onRequestClose={loading ? undefined : handleResume}>
       <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
-        <TouchableOpacity style={StyleSheet.absoluteFill} onPress={handleResume} activeOpacity={1} />
+        {/* Block backdrop tap while loading so driver can't accidentally dismiss */}
+        {!loading && <TouchableOpacity style={StyleSheet.absoluteFill} onPress={handleResume} activeOpacity={1} />}
 
         <Animated.View style={[
           styles.sheet,

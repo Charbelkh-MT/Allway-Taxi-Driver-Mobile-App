@@ -117,8 +117,16 @@ let locationSubscription = null;
 
 async function startForegroundTracking(cachedUserId) {
   const { status } = await Location.requestForegroundPermissionsAsync();
-  if (status !== 'granted') { console.warn('[GPS] Permission denied'); return; }
-  if (locationSubscription) return;
+  if (status !== 'granted') {
+    console.warn('[GPS] Permission denied');
+    Alert.alert(
+      'Location Required',
+      'Enable location permission in Settings to go online and receive trips.',
+      [{ text: 'OK' }]
+    );
+    return false;
+  }
+  if (locationSubscription) return true;
 
   locationSubscription = await Location.watchPositionAsync(
     {
@@ -206,6 +214,7 @@ export function DriverProvider({ children }) {
 
   const timerRef          = useRef(null);
   const startTimeRef      = useRef(null);
+  const emergencyPollRef  = useRef(null);
   const scanTimeoutRef    = useRef(null);
   const currentShiftRef   = useRef(null);
   const channelRef        = useRef(null);
@@ -239,6 +248,7 @@ export function DriverProvider({ children }) {
   useEffect(() => {
     return () => {
       clearInterval(timerRef.current);
+      clearInterval(emergencyPollRef.current);
       clearTimeout(scanTimeoutRef.current);
       if (channelRef.current) supabase.removeChannel(channelRef.current);
     };
@@ -521,11 +531,25 @@ export function DriverProvider({ children }) {
         console.log('[Realtime] dispatch channel:', status);
         if (status === 'SUBSCRIBED') {
           console.log('[Realtime] ✅ Channel connected — listening for trips (carType:', carTypeRef.current, ')');
+          // Clear emergency poll — normal realtime is active
+          clearInterval(emergencyPollRef.current);
+          emergencyPollRef.current = null;
           syncPendingTrips();
           fetchScheduledTrips();
         }
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.warn('[Realtime] ❌ Channel error — trips will not be received until reconnect');
+          console.warn('[Realtime] ❌ Channel error — falling back to 3s polling');
+          // Emergency poll every 3s while realtime is down so no trip is missed
+          clearInterval(emergencyPollRef.current);
+          emergencyPollRef.current = setInterval(() => syncPendingTrips(), 3000);
+          // Attempt to reconnect after 5s
+          setTimeout(() => {
+            const uid = userIdRef.current;
+            if (uid && driverState !== DRIVER_STATE.OFFLINE) {
+              console.log('[Realtime] Attempting channel reconnect...');
+              subscribeToTrips(uid);
+            }
+          }, 5000);
         }
       });
   }
@@ -536,9 +560,18 @@ export function DriverProvider({ children }) {
     if (paymentMethod === 'cash') {
       cash = fareNum;
     } else if (paymentMethod.startsWith('split|')) {
-      const parts = paymentMethod.split('|');
-      for (let i = 1; i < parts.length - 1; i += 2) {
-        if (parts[i] === 'cash') cash += parseFloat(parts[i + 1]) || 0;
+      try {
+        const parts = paymentMethod.split('|');
+        // Expected: split|method1|amount1|method2|amount2
+        if (parts.length < 5 || parts.length % 2 === 0) throw new Error('malformed');
+        for (let i = 1; i < parts.length - 1; i += 2) {
+          const amount = parseFloat(parts[i + 1]);
+          if (isNaN(amount)) throw new Error(`bad amount at ${i + 1}`);
+          if (parts[i] === 'cash') cash += amount;
+        }
+      } catch (e) {
+        console.warn('[DriverContext] addCashFromPayment parse error:', e.message, paymentMethod);
+        return;
       }
     }
     if (cash > 0) {
@@ -586,13 +619,13 @@ export function DriverProvider({ children }) {
 
       const shiftStart = startTimeRef.current
         ? new Date(startTimeRef.current).toISOString()
-        : new Date(Date.now() - shiftSeconds * 1000).toISOString();
+        : new Date(Date.now() - Math.floor((Date.now() - (startTimeRef.current ?? Date.now())) )).toISOString();
 
       const { data } = await supabase
         .from(TABLE_TRIPS)
         .select(`${TRIP_COLS.status}, ${TRIP_COLS.fare}, ${TRIP_COLS.pickupAddress}, ${TRIP_COLS.distanceKm}`)
         .eq(TRIP_COLS.driverId, user.id)
-        .gte('accepted_at', shiftStart);
+        .gte(TRIP_COLS.acceptedAt, shiftStart);
 
       let tripsCompleted = 0, tripsCancelled = 0, tripsNoShow = 0;
       let totalEarned = 0, totalDistanceKm = 0;
@@ -684,7 +717,7 @@ export function DriverProvider({ children }) {
 
     isDemoRef.current = false;
     subscribeToTrips(user.id);
-    fetchScheduledTrips();
+    // fetchScheduledTrips is called in the SUBSCRIBED callback — no need to call it here
 
     try {
       await supabase.from(TABLE_DRIVERS)
@@ -744,6 +777,8 @@ export function DriverProvider({ children }) {
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
     }
+    clearInterval(emergencyPollRef.current);
+    emergencyPollRef.current = null;
 
     stopForegroundTracking();
     stopLocationTracking();
@@ -755,7 +790,10 @@ export function DriverProvider({ children }) {
           .from(TABLE_SHIFTS)
           .update({
             ended_at:   new Date().toISOString(),
-            duration_s: shiftSeconds,
+            // Use ref-based elapsed time — shiftSeconds state may be 1-2s stale
+            duration_s: startTimeRef.current
+              ? Math.floor((Date.now() - startTimeRef.current) / 1000)
+              : shiftSeconds,
             ...(summaryData ? {
               trips_completed:   summaryData.tripsCompleted,
               trips_cancelled:   summaryData.tripsCancelled,
@@ -824,6 +862,19 @@ export function DriverProvider({ children }) {
       }
     }
 
+    // Update driver status in DB BEFORE changing UI state so CRM is never
+    // momentarily showing the driver as available while they're already on a trip.
+    const uid = userIdRef.current;
+    if (!isDemoRef.current && uid) {
+      try {
+        await supabase.from(TABLE_DRIVERS)
+          .update({ [DRIVER_COLS.status]: 'on_trip' })
+          .eq(DRIVER_COLS.id, uid);
+      } catch (e) {
+        console.warn('[DriverContext] acceptTrip driver status error:', e.message);
+      }
+    }
+
     activeTripIdRef.current = resolved.id;
     setActiveTrip(resolved);
     setDriverState(DRIVER_STATE.ACTIVE);
@@ -831,77 +882,81 @@ export function DriverProvider({ children }) {
     setPendingTrip(null);
     setAvailableTrips(prev => prev.filter(t => t.id !== resolved.id));
 
-    // Persist active trip so it survives the app being fully closed.
-    // acceptedAt lets the trip timer resume from the correct time.
     try {
       const tripToSave = { ...resolved, acceptedAt: new Date().toISOString() };
       await AsyncStorage.setItem(ACTIVE_TRIP_STORAGE_KEY, JSON.stringify(tripToSave));
     } catch (e) { console.warn('[DriverContext] Save active trip error:', e.message); }
-
-    const uid = userIdRef.current;
-    if (!isDemoRef.current && uid) {
-      try {
-        await supabase.from(TABLE_DRIVERS).update({ [DRIVER_COLS.status]: 'on_trip' }).eq(DRIVER_COLS.id, uid);
-      } catch {}
-    }
   }
 
   async function pickUpPassenger() {
-    const tripId  = activeTripIdRef.current;
-    const now     = new Date().toISOString();
+    const tripId = activeTripIdRef.current;
+    const now    = new Date().toISOString();
+
+    // Write to DB FIRST — if it fails we must not update the UI.
+    // pickup_at is critical for trip duration and billing accountability.
+    if (!isDemoRef.current && tripId) {
+      try {
+        const { error } = await supabase.from(TABLE_TRIPS).update({
+          [TRIP_COLS.status]:   'picked_up',
+          [TRIP_COLS.pickupAt]: now,
+        }).eq(TRIP_COLS.id, tripId);
+        if (error) throw error;
+      } catch (e) {
+        console.warn('[DriverContext] pickUpPassenger DB error:', e.message);
+        Alert.alert('Error', 'Could not record pickup. Please try again.');
+        return;
+      }
+    }
+
+    // DB confirmed — now update local state and start trip timer
     pickupTimeRef.current = Date.now();
     setActiveTrip(prev => {
       const updated = prev ? { ...prev, status: 'picked_up', pickupAt: now } : prev;
       if (updated) AsyncStorage.setItem(ACTIVE_TRIP_STORAGE_KEY, JSON.stringify(updated)).catch(() => {});
       return updated;
     });
-    if (!isDemoRef.current && tripId) {
-      try {
-        await supabase.from(TABLE_TRIPS).update({
-          [TRIP_COLS.status]:   'picked_up',
-          [TRIP_COLS.pickupAt]: now,
-        }).eq(TRIP_COLS.id, tripId);
-      } catch (e) { console.warn('[DriverContext] pickUpPassenger error:', e.message); }
-    }
   }
 
   async function markNoShow() {
     const tripId = activeTripIdRef.current;
+    const uid    = userIdRef.current;
     activeTripIdRef.current = null;
     setActiveTrip(null);
     setDriverState(DRIVER_STATE.SCANNING);
     try { await AsyncStorage.removeItem(ACTIVE_TRIP_STORAGE_KEY); } catch {}
     if (!isDemoRef.current && tripId) {
-      // Run the trip update first — it has no user dependency and must always succeed
-      try {
-        await supabase.from(TABLE_TRIPS).update({ [TRIP_COLS.status]: 'no_show' }).eq(TRIP_COLS.id, tripId);
-      } catch (e) { console.warn('[DriverContext] markNoShow trip error:', e.message); }
-      const uid = userIdRef.current;
-      if (uid) {
-        try {
-          await supabase.from(TABLE_DRIVERS).update({ [DRIVER_COLS.status]: 'available' }).eq(DRIVER_COLS.id, uid);
-        } catch (e) { console.warn('[DriverContext] markNoShow driver error:', e.message); }
+      const [tripRes, driverRes] = await Promise.allSettled([
+        supabase.from(TABLE_TRIPS).update({ [TRIP_COLS.status]: 'no_show' }).eq(TRIP_COLS.id, tripId),
+        uid ? supabase.from(TABLE_DRIVERS).update({ [DRIVER_COLS.status]: 'available' }).eq(DRIVER_COLS.id, uid) : Promise.resolve(),
+      ]);
+      if (tripRes.status === 'rejected' || tripRes.value?.error)
+        console.warn('[DriverContext] markNoShow trip error:', tripRes.reason ?? tripRes.value?.error?.message);
+      if (driverRes.status === 'rejected' || driverRes.value?.error) {
+        console.warn('[DriverContext] markNoShow driver status error');
+        Alert.alert('Status Error', 'Your status could not be updated. You may appear as "on trip" to dispatchers. Please contact support if this persists.');
       }
     }
   }
 
   async function cancelTrip(reason = '') {
     const tripId = activeTripIdRef.current;
+    const uid    = userIdRef.current;
     activeTripIdRef.current = null;
     setActiveTrip(null);
     setDriverState(DRIVER_STATE.SCANNING);
     try { await AsyncStorage.removeItem(ACTIVE_TRIP_STORAGE_KEY); } catch {}
     if (!isDemoRef.current && tripId) {
-      try {
-        await supabase.from(TABLE_TRIPS)
+      const [tripRes, driverRes] = await Promise.allSettled([
+        supabase.from(TABLE_TRIPS)
           .update({ [TRIP_COLS.status]: 'cancelled', [TRIP_COLS.cancelReason]: reason })
-          .eq(TRIP_COLS.id, tripId);
-      } catch (e) { console.warn('[DriverContext] cancelTrip trip error:', e.message); }
-      const uid = userIdRef.current;
-      if (uid) {
-        try {
-          await supabase.from(TABLE_DRIVERS).update({ [DRIVER_COLS.status]: 'available' }).eq(DRIVER_COLS.id, uid);
-        } catch (e) { console.warn('[DriverContext] cancelTrip driver error:', e.message); }
+          .eq(TRIP_COLS.id, tripId),
+        uid ? supabase.from(TABLE_DRIVERS).update({ [DRIVER_COLS.status]: 'available' }).eq(DRIVER_COLS.id, uid) : Promise.resolve(),
+      ]);
+      if (tripRes.status === 'rejected' || tripRes.value?.error)
+        console.warn('[DriverContext] cancelTrip trip error:', tripRes.reason ?? tripRes.value?.error?.message);
+      if (driverRes.status === 'rejected' || driverRes.value?.error) {
+        console.warn('[DriverContext] cancelTrip driver status error');
+        Alert.alert('Status Error', 'Your status could not be updated. Contact support if you stop receiving trips.');
       }
     }
   }
@@ -936,23 +991,31 @@ export function DriverProvider({ children }) {
         distanceKm = Math.round(distanceKm * 10) / 10;
       }
 
+      const fullPayload = {
+        [TRIP_COLS.status]:         'completed',
+        [TRIP_COLS.paymentMethod]:  normalizedMethod,
+        [TRIP_COLS.durationMin]:    durationMin,
+        [TRIP_COLS.distanceKm]:     distanceKm,
+        completed_at:               new Date().toISOString(),
+        ...(customerRating ? { [TRIP_COLS.customerRating]: customerRating } : {}),
+      };
       try {
-        await supabase
-          .from(TABLE_TRIPS)
-          .update({
-            [TRIP_COLS.status]:         'completed',
-            [TRIP_COLS.paymentMethod]:  normalizedMethod,
-            [TRIP_COLS.durationMin]:    durationMin,
-            [TRIP_COLS.distanceKm]:     distanceKm,
-            ...(customerRating ? { [TRIP_COLS.customerRating]: customerRating } : {}),
-            completed_at:               new Date().toISOString(),
-          })
-          .eq(TRIP_COLS.id, tripId);
+        const { error } = await supabase.from(TABLE_TRIPS).update(fullPayload).eq(TRIP_COLS.id, tripId);
+        if (error) throw error;
       } catch (e) {
-        console.warn('[DriverContext] completeTrip full update failed, retrying status only:', e.message);
+        console.warn('[DriverContext] completeTrip failed, retrying in 2s:', e.message);
+        await new Promise(r => setTimeout(r, 2000));
         try {
-          await supabase.from(TABLE_TRIPS).update({ [TRIP_COLS.status]: 'completed' }).eq(TRIP_COLS.id, tripId);
-        } catch (e2) { console.warn('[DriverContext] completeTrip fallback error:', e2.message); }
+          // Retry with the FULL payload — never fall back to status-only (payment data would be lost)
+          const { error: e2 } = await supabase.from(TABLE_TRIPS).update(fullPayload).eq(TRIP_COLS.id, tripId);
+          if (e2) throw e2;
+        } catch (e3) {
+          console.warn('[DriverContext] completeTrip retry also failed:', e3.message);
+          Alert.alert(
+            'Trip Save Failed',
+            'Payment details could not be recorded. Your trip is marked complete but receipts may be missing. Please inform the dispatcher.',
+          );
+        }
       }
       const uid = userIdRef.current;
       if (uid) {
@@ -1007,6 +1070,8 @@ export function DriverProvider({ children }) {
         openTripSheet,
         closeTripSheet,
         dismissTrip,
+        syncPendingTrips,
+        fetchScheduledTrips,
       }}
     >
       {children}

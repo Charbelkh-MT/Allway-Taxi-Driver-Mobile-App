@@ -53,7 +53,7 @@ export default function TripRequestSheet({ trip, onAccept, onDecline, withSound 
 
     // If time already expired by the time the driver opens the app, auto-decline immediately
     const initial = getInitialCountdown(trip);
-    if (initial <= 0) { onDecline(); return; }
+    if (initial <= 0) { clearInterval(intervalRef.current); onDecline(); return; }
 
     intervalRef.current = setInterval(() => {
       setCountdown(prev => {

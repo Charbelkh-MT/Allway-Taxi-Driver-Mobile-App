@@ -50,8 +50,10 @@ export function AuthProvider({ children }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (isDemoRef.current) return;
       if (session?.user) {
-        // INITIAL_SESSION already handled by getSession() — only react to explicit sign-in/refresh
-        if (_event === 'SIGNED_IN' || _event === 'TOKEN_REFRESHED') {
+        // INITIAL_SESSION handled by getSession() above.
+        // TOKEN_REFRESHED is an internal rotation — the driver profile hasn't changed,
+        // and calling fetchDriverProfile mid-trip would disrupt the profile channel.
+        if (_event === 'SIGNED_IN') {
           fetchDriverProfile(session.user.id);
         }
       } else if (_event === 'SIGNED_OUT') {

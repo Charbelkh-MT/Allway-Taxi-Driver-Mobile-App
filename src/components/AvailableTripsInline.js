@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Alert,
+  View, Text, StyleSheet, TouchableOpacity, Alert, FlatList, Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -8,15 +8,13 @@ import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 import { FONTS, RADIUS } from '../theme';
 
+const { width: SCREEN_W } = Dimensions.get('window');
 const ORANGE = '#F5A623';
 
-function TripCard({ trip, onAccept, onDismiss, colors, isDark }) {
-  const { t } = useLanguage();
-  const accent = trip.isPreferred ? colors.yellow : colors.green;
-
+function TripCard({ trip, onAccept, onDismiss, colors, isDark, t }) {
   return (
     <View style={[styles.card, { backgroundColor: colors.bgCard, borderColor: colors.border }, !isDark && styles.shadow]}>
-      <View style={[styles.accent, { backgroundColor: accent }]} />
+      <View style={[styles.accent, { backgroundColor: trip.isPreferred ? colors.yellow : colors.green }]} />
       <View style={styles.body}>
 
         {/* Header row */}
@@ -73,22 +71,20 @@ function TripCard({ trip, onAccept, onDismiss, colors, isDark }) {
           </View>
         )}
 
-        {/* Action buttons */}
+        {/* Buttons */}
         <View style={styles.actions}>
           <TouchableOpacity
-            onPress={() => {
-              Alert.alert(
-                'Decline Trip?',
-                `Are you sure you want to decline the trip from ${trip.pickup}?`,
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Decline', style: 'destructive', onPress: async () => {
-                    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                    onDismiss(trip.id);
-                  }},
-                ]
-              );
-            }}
+            onPress={() => Alert.alert(
+              'Decline Trip?',
+              `Are you sure you want to decline the trip from ${trip.pickup}?`,
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Decline', style: 'destructive', onPress: async () => {
+                  await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  onDismiss(trip.id);
+                }},
+              ]
+            )}
             style={[styles.declineBtn, { backgroundColor: colors.redFaint, borderColor: `${colors.red}30` }]}
             activeOpacity={0.8}
           >
@@ -96,19 +92,17 @@ function TripCard({ trip, onAccept, onDismiss, colors, isDark }) {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => {
-              Alert.alert(
-                'Accept Trip?',
-                `${trip.pickup} → ${trip.dropoff}  ·  ${trip.fare}`,
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Accept', onPress: async () => {
-                    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                    onAccept(trip);
-                  }},
-                ]
-              );
-            }}
+            onPress={() => Alert.alert(
+              'Accept Trip?',
+              `${trip.pickup} → ${trip.dropoff}  ·  ${trip.fare}`,
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Accept', onPress: async () => {
+                  await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  onAccept(trip);
+                }},
+              ]
+            )}
             style={styles.acceptWrap}
             activeOpacity={0.85}
           >
@@ -129,51 +123,90 @@ function TripCard({ trip, onAccept, onDismiss, colors, isDark }) {
 
 export default function AvailableTripsInline({ trips, onAccept, onDismiss }) {
   const { colors, isDark } = useTheme();
-  const { t } = useLanguage();
+  const { t }              = useLanguage();
+  const [currentIndex, setCurrentIndex] = useState(0);
 
   if (!trips?.length) return null;
 
-  console.log('[AvailableTripsInline] Rendering', trips.length, 'trip(s)');
-
   return (
-    <View style={[styles.container, { backgroundColor: `${colors.green}0F`, borderColor: `${colors.green}2E` }]}>
+    <View style={styles.container}>
       {/* Header */}
-      <View style={styles.topRow}>
-        <View style={[styles.liveDot, { backgroundColor: colors.green }]} />
-        <Text style={[styles.heading, { color: colors.green }]}>
-          {trips.length} {trips.length === 1 ? t('tripAvailable') : t('tripsAvailable')}
-        </Text>
-        <Text style={[styles.subheading, { color: `${colors.green}80` }]}>{t('liveMatchingArea')}</Text>
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <View style={[styles.liveDot, { backgroundColor: colors.green }]} />
+          <Text style={[styles.heading, { color: colors.green }]}>
+            {trips.length} {trips.length === 1 ? t('tripAvailable') : t('tripsAvailable')}
+          </Text>
+        </View>
+        {trips.length > 1 && (
+          <Text style={[styles.counter, { color: colors.textDisabled }]}>
+            {currentIndex + 1} / {trips.length}
+          </Text>
+        )}
       </View>
 
-      {/* Trip list — plain View since we're already inside HomeScreen's ScrollView */}
-      <View>
-        {trips.map(trip => (
-          <TripCard
-            key={trip.id}
-            trip={trip}
-            onAccept={onAccept}
-            onDismiss={onDismiss}
-            colors={colors}
-            isDark={isDark}
-          />
-        ))}
-      </View>
+      {/* Full-width carousel */}
+      <FlatList
+        data={trips}
+        keyExtractor={item => item.id}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        decelerationRate="fast"
+        onMomentumScrollEnd={e => {
+          const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_W);
+          setCurrentIndex(Math.min(Math.max(idx, 0), trips.length - 1));
+        }}
+        renderItem={({ item }) => (
+          <View style={styles.page}>
+            <TripCard
+              trip={item}
+              onAccept={onAccept}
+              onDismiss={onDismiss}
+              colors={colors}
+              isDark={isDark}
+              t={t}
+            />
+          </View>
+        )}
+      />
+
+      {/* Pagination dots */}
+      {trips.length > 1 && (
+        <View style={styles.dots}>
+          {trips.map((_, i) => (
+            <View
+              key={i}
+              style={[
+                styles.dotIndicator,
+                { backgroundColor: i === currentIndex ? colors.green : colors.border,
+                  width: i === currentIndex ? 18 : 7 },
+              ]}
+            />
+          ))}
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container:  { marginHorizontal: 18, marginTop: 18, borderWidth: 1, borderRadius: RADIUS.xxl, paddingVertical: 18, paddingHorizontal: 16, gap: 12 },
+  container: { paddingTop: 18 },
 
-  topRow:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, marginBottom: 12 },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   liveDot:    { width: 8, height: 8, borderRadius: 4 },
-  heading:    { fontSize: 13, fontFamily: FONTS.black, flex: 1 },
-  subheading: { fontSize: 11, fontFamily: FONTS.semiBold },
+  heading:    { fontSize: 10, fontFamily: FONTS.extraBold, letterSpacing: 1.2, textTransform: 'uppercase' },
+  counter:    { fontSize: 11, fontFamily: FONTS.semiBold },
 
-  // Card
+  page: { width: SCREEN_W, paddingHorizontal: 18 },
+
+  dots:         { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: 12 },
+  dotIndicator: { height: 7, borderRadius: 4 },
+
+  // Card — same structure as TripRow / UpcomingTrips
   shadow:  { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2 },
-  card:    { flexDirection: 'row', borderWidth: 1, borderRadius: RADIUS.xl, overflow: 'hidden', marginBottom: 10 },
+  card:    { flexDirection: 'row', borderWidth: 1, borderRadius: RADIUS.xl, overflow: 'hidden' },
   accent:  { width: 5 },
   body:    { flex: 1, padding: 14, gap: 10 },
 

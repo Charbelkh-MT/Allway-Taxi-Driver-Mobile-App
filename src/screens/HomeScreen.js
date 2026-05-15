@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef, memo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Platform, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Platform, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -34,12 +34,28 @@ export default function HomeScreen() {
     cashCollected, scheduledTrips, buildShiftSummary,
     goOnline, goOffline, acceptTrip, completeTrip,
     pickUpPassenger, markNoShow, cancelTrip, openTripSheet, dismissTrip,
+    syncPendingTrips, fetchScheduledTrips,
   } = useDriver();
 
   const [showSummary,           setShowSummary]            = useState(false);
   const [summaryData,           setSummaryData]            = useState(null);
   const [selectedScheduledTrip, setSelectedScheduledTrip] = useState(null);
   const [summaryLoading,        setSummaryLoading]         = useState(false);
+  const [refreshing,            setRefreshing]             = useState(false);
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    try {
+      await fetchWeeklyEarnings();
+      if (isOnline) {
+        await Promise.all([syncPendingTrips(), fetchScheduledTrips()]);
+      }
+    } catch (e) {
+      console.warn('[HomeScreen] Refresh error:', e.message);
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   async function initiateEndShift() {
     setSummaryData(null);
@@ -146,7 +162,19 @@ export default function HomeScreen() {
         <AppHeader online={isOnline} />
       </SafeAreaView>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.yellow}
+            colors={[colors.yellow]}
+          />
+        }
+      >
         <FadeInView delay={0} distance={12}>
           <GreetingHeader
             name={firstName}
