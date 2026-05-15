@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView,
+  View, Text, StyleSheet, TouchableOpacity, Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -76,7 +76,19 @@ function TripCard({ trip, onAccept, onDismiss, colors, isDark }) {
         {/* Action buttons */}
         <View style={styles.actions}>
           <TouchableOpacity
-            onPress={async () => { await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onDismiss(trip.id); }}
+            onPress={() => {
+              Alert.alert(
+                'Decline Trip?',
+                `Are you sure you want to decline the trip from ${trip.pickup}?`,
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Decline', style: 'destructive', onPress: async () => {
+                    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    onDismiss(trip.id);
+                  }},
+                ]
+              );
+            }}
             style={[styles.declineBtn, { backgroundColor: colors.redFaint, borderColor: `${colors.red}30` }]}
             activeOpacity={0.8}
           >
@@ -84,7 +96,19 @@ function TripCard({ trip, onAccept, onDismiss, colors, isDark }) {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={async () => { await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); onAccept(trip); }}
+            onPress={() => {
+              Alert.alert(
+                'Accept Trip?',
+                `${trip.pickup} → ${trip.dropoff}  ·  ${trip.fare}`,
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Accept', onPress: async () => {
+                    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                    onAccept(trip);
+                  }},
+                ]
+              );
+            }}
             style={styles.acceptWrap}
             activeOpacity={0.85}
           >
@@ -109,6 +133,8 @@ export default function AvailableTripsInline({ trips, onAccept, onDismiss }) {
 
   if (!trips?.length) return null;
 
+  console.log('[AvailableTripsInline] Rendering', trips.length, 'trip(s)');
+
   return (
     <View style={[styles.container, { backgroundColor: `${colors.green}0F`, borderColor: `${colors.green}2E` }]}>
       {/* Header */}
@@ -120,12 +146,8 @@ export default function AvailableTripsInline({ trips, onAccept, onDismiss }) {
         <Text style={[styles.subheading, { color: `${colors.green}80` }]}>{t('liveMatchingArea')}</Text>
       </View>
 
-      {/* Trip list */}
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        scrollEnabled={trips.length > 1}
-        nestedScrollEnabled
-      >
+      {/* Trip list — plain View since we're already inside HomeScreen's ScrollView */}
+      <View>
         {trips.map(trip => (
           <TripCard
             key={trip.id}
@@ -136,7 +158,7 @@ export default function AvailableTripsInline({ trips, onAccept, onDismiss }) {
             isDark={isDark}
           />
         ))}
-      </ScrollView>
+      </View>
     </View>
   );
 }

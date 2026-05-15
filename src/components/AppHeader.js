@@ -1,14 +1,24 @@
-import React, { useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, Image, Platform, Animated } from 'react-native';
+import React, { useRef, useEffect, useState } from 'react';
+import { View, Text, StyleSheet, Image, Platform, Animated, AppState } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 import { FONTS, RADIUS } from '../theme';
 
+async function checkNetwork() {
+  try {
+    const res = await fetch('https://www.google.com', { method: 'HEAD' });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export default function AppHeader({ online }) {
   const { colors, isDark } = useTheme();
   const { t, isRTL } = useLanguage();
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const pulseAnim  = useRef(new Animated.Value(1)).current;
+  const [isOffline, setIsOffline] = useState(false);
 
   useEffect(() => {
     if (!online) { pulseAnim.setValue(1); return; }
@@ -21,6 +31,20 @@ export default function AppHeader({ online }) {
     loop.start();
     return () => loop.stop();
   }, [online]);
+
+  // Check network on mount and whenever the app comes to foreground
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      const ok = await checkNetwork();
+      if (!cancelled) setIsOffline(!ok);
+    };
+    run();
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'active') run();
+    });
+    return () => { cancelled = true; sub.remove(); };
+  }, []);
 
   const content = (
     <View style={[styles.inner, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
@@ -57,11 +81,18 @@ export default function AppHeader({ online }) {
     </View>
   );
 
+  const offlineBanner = isOffline ? (
+    <View style={styles.offlineBanner}>
+      <Text style={styles.offlineText}>⚠  No internet connection — live features unavailable</Text>
+    </View>
+  ) : null;
+
   if (Platform.OS === 'ios' && isDark) {
     return (
       <BlurView intensity={85} tint="systemUltraThinMaterialDark" style={{ overflow: 'hidden' }}>
         <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(8,8,16,0.4)' }]} pointerEvents="none" />
         {content}
+        {offlineBanner}
       </BlurView>
     );
   }
@@ -69,6 +100,7 @@ export default function AppHeader({ online }) {
   return (
     <View style={{ backgroundColor: colors.bg }}>
       {content}
+      {offlineBanner}
     </View>
   );
 }
@@ -99,4 +131,7 @@ const styles = StyleSheet.create({
   statusText:  { gap: 1 },
   statusLabel: { fontSize: 13, fontFamily: FONTS.extraBold },
   statusSub:   { fontSize: 10, fontFamily: FONTS.semiBold },
+
+  offlineBanner: { backgroundColor: '#F5A623', paddingVertical: 6, paddingHorizontal: 16, alignItems: 'center' },
+  offlineText:   { fontSize: 11, fontFamily: FONTS.extraBold, color: '#000', letterSpacing: 0.3 },
 });

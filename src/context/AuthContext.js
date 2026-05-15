@@ -1,7 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../utils/supabase';
 import { TABLE_DRIVERS, DRIVER_COLS } from '../config';
 import { registerForPushNotificationsAsync } from '../utils/notifications';
+
+const PROFILE_CACHE_KEY = 'allway_driver_profile';
 
 const AuthContext = createContext(null);
 
@@ -77,7 +80,7 @@ export function AuthProvider({ children }) {
   }
 
   function applyDriverRow(data) {
-    setDriver({
+    const profile = {
       id:         data[DRIVER_COLS.id],
       name:       data[DRIVER_COLS.name]       ?? 'Driver',
       phone:      data[DRIVER_COLS.phone]      ?? '',
@@ -89,10 +92,19 @@ export function AuthProvider({ children }) {
       photoUrl:   data[DRIVER_COLS.photoUrl]   ?? null,
       carType:    data[DRIVER_COLS.carType]    ?? 'comfort',
       initial:    (data[DRIVER_COLS.name] ?? 'D')[0].toUpperCase(),
-    });
+    };
+    setDriver(profile);
+    // Cache so the profile loads correctly when the app opens offline
+    AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(profile)).catch(() => {});
   }
 
   async function fetchDriverProfile(authUserId) {
+    // Load cached profile first so the UI is correct even if network is slow/offline
+    try {
+      const cached = await AsyncStorage.getItem(PROFILE_CACHE_KEY);
+      if (cached) setDriver(JSON.parse(cached));
+    } catch {}
+
     try {
       const { data, error } = await supabase
         .from(TABLE_DRIVERS)
@@ -106,7 +118,7 @@ export function AuthProvider({ children }) {
         .eq(DRIVER_COLS.id, authUserId)
         .single();
       if (error) throw error;
-      applyDriverRow(data);
+      applyDriverRow(data); // Updates cache with fresh data
 
       // Push tokens can rotate — overwrite on every app open
       registerForPushNotificationsAsync().then(token => {
@@ -155,6 +167,7 @@ export function AuthProvider({ children }) {
     isDemoRef.current = false;
     unsubscribeProfile();
     await supabase.auth.signOut();
+    AsyncStorage.removeItem(PROFILE_CACHE_KEY).catch(() => {});
     setDriver(FALLBACK_DRIVER);
     setIsAuthenticated(false);
   }

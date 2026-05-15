@@ -204,17 +204,20 @@ export function DriverProvider({ children }) {
   const [cashCollected, setCashCollected]   = useState(0);
   const [scheduledTrips, setScheduledTrips] = useState([]);
 
-  const timerRef        = useRef(null);
-  const startTimeRef    = useRef(null);
-  const scanTimeoutRef  = useRef(null);
-  const currentShiftRef = useRef(null);
-  const channelRef      = useRef(null);
-  const activeTripIdRef = useRef(null);
-  const carTypeRef      = useRef('comfort');
-  const isDemoRef       = useRef(false);
-  const userIdRef       = useRef(null);
-  const pickupTimeRef   = useRef(null);
-  const cashRef         = useRef(0);
+  const timerRef          = useRef(null);
+  const startTimeRef      = useRef(null);
+  const scanTimeoutRef    = useRef(null);
+  const currentShiftRef   = useRef(null);
+  const channelRef        = useRef(null);
+  const activeTripIdRef   = useRef(null);
+  const carTypeRef        = useRef('comfort');
+  const isDemoRef         = useRef(false);
+  const userIdRef         = useRef(null);
+  const pickupTimeRef     = useRef(null);
+  const cashRef           = useRef(0);
+  // Trips the driver dismissed this session — filtered out of every DB sync
+  // so they don't reappear. Cleared when the shift ends.
+  const dismissedIdsRef   = useRef(new Set());
 
   useEffect(() => {
     if (driverState === DRIVER_STATE.OFFLINE) {
@@ -393,7 +396,10 @@ export function DriverProvider({ children }) {
         .eq(TRIP_COLS.status, 'pending')
         .is(TRIP_COLS.driverId, null)
         .eq(TRIP_COLS.rideType, carTypeRef.current);
-      setAvailableTrips(markPreferred((data ?? []).map(normalizeTrip), userIdRef.current));
+      const trips = (data ?? [])
+        .map(normalizeTrip)
+        .filter(t => !dismissedIdsRef.current.has(t.id));
+      setAvailableTrips(markPreferred(trips, userIdRef.current));
     } catch (e) { console.warn('[DriverContext] syncPendingTrips error:', e.message); }
   }
 
@@ -450,6 +456,8 @@ export function DriverProvider({ children }) {
           if (row[TRIP_COLS.rideType] && row[TRIP_COLS.rideType] !== carTypeRef.current) return;
           // Skip trips pre-assigned to a different driver
           if (driverId && driverId !== userIdRef.current) return;
+          // Skip trips already dismissed this session
+          if (dismissedIdsRef.current.has(row[TRIP_COLS.id])) return;
 
           const trip = normalizeTrip(row);
 
@@ -730,6 +738,7 @@ export function DriverProvider({ children }) {
     cashRef.current = 0;
     setCashCollected(0);
     setScheduledTrips([]);
+    dismissedIdsRef.current.clear();
 
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
@@ -966,10 +975,10 @@ export function DriverProvider({ children }) {
     setPendingTrip(null);
   }
 
-  // Removes a trip from the local available list without touching the DB.
-  // Used when the driver taps Decline on the inline list — the trip stays
-  // in the DB so other drivers can still claim it.
+  // Removes a trip from the local available list and remembers it so DB syncs
+  // don't bring it back. The trip stays in the DB for other drivers to claim.
   function dismissTrip(tripId) {
+    dismissedIdsRef.current.add(tripId);
     setAvailableTrips(prev => prev.filter(t => t.id !== tripId));
   }
 
