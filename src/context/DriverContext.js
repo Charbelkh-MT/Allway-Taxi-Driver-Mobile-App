@@ -402,24 +402,38 @@ export function DriverProvider({ children }) {
     } catch (e) { console.warn('[DriverContext] syncPendingTrips error:', e.message); }
   }
 
-  function subscribeToTrips(userId) {
+  async function subscribeToTrips(userId) {
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
     }
 
+    // Explicitly refresh the realtime auth token so RLS can evaluate correctly.
+    // Without this, the channel may connect unauthenticated on cold start and
+    // silently receive no events even though the subscription shows SUBSCRIBED.
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        await supabase.realtime.setAuth(session.access_token);
+        console.log('[Realtime] Auth token set on realtime client');
+      }
+    } catch (e) {
+      console.warn('[Realtime] Could not set auth token:', e.message);
+    }
+
     channelRef.current = supabase
       .channel(`dispatch-${userId}`)
-      // INSERT — server-side filtered by ride_type to reduce unnecessary traffic
+      // INSERT — no server-side filter so Supabase delivers all inserts regardless
+      // of REPLICA IDENTITY setting. Client-side filters handle ride_type + driver_id.
       .on(
         'postgres_changes',
         {
           event:  'INSERT',
           schema: 'public',
           table:  TABLE_TRIPS,
-          filter: `${TRIP_COLS.rideType}=eq.${carTypeRef.current}`,
         },
         (payload) => {
+          console.log('[Realtime] INSERT received — status:', payload.new?.[TRIP_COLS.status], 'rideType:', payload.new?.[TRIP_COLS.rideType]);
           const row      = payload.new;
           if (!row) return;
           const status   = row[TRIP_COLS.status];
@@ -437,8 +451,9 @@ export function DriverProvider({ children }) {
           }
 
           if (status !== 'pending') return;
-          // Skip trips pre-assigned to a different driver — but allow trips
-          // where driver_id is null (open dispatch) OR set to this driver directly.
+          // Skip trips for a different car type
+          if (row[TRIP_COLS.rideType] && row[TRIP_COLS.rideType] !== carTypeRef.current) return;
+          // Skip trips pre-assigned to a different driver
           if (driverId && driverId !== userIdRef.current) return;
 
           const trip = normalizeTrip(row);
@@ -456,6 +471,7 @@ export function DriverProvider({ children }) {
           setAvailableTrips(prev =>
             prev.find(t => t.id === markedTrip.id) ? prev : [markedTrip, ...prev]
           );
+          console.log('[Realtime] Opening trip sheet for:', trip.id);
           openTripSheet(trip, true);
         }
       )
@@ -496,9 +512,13 @@ export function DriverProvider({ children }) {
       )
       .subscribe((status) => {
         console.log('[Realtime] dispatch channel:', status);
-        // On reconnect after a dropped connection, re-sync the pending queue so
-        // any trips dispatched while offline are recovered immediately.
-        if (status === 'SUBSCRIBED') syncPendingTrips();
+        if (status === 'SUBSCRIBED') {
+          console.log('[Realtime] ✅ Channel connected — listening for trips (carType:', carTypeRef.current, ')');
+          syncPendingTrips();
+        }
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('[Realtime] ❌ Channel error — trips will not be received until reconnect');
+        }
       });
   }
 

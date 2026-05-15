@@ -9,7 +9,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useDriver } from '../context/DriverContext';
 import { useLanguage } from '../context/LanguageContext';
 import { FONTS, RADIUS } from '../theme';
-import { relativeTime, formatScheduledTime } from '../utils/dateUtils';
+import { relativeTime, formatScheduledTime, formatTripDateTime } from '../utils/dateUtils';
 import AppHeader from '../components/AppHeader';
 import { SkeletonTripCard } from '../components/Skeleton';
 import { supabase } from '../utils/supabase';
@@ -80,6 +80,7 @@ export default function TripsScreen() {
           TRIP_COLS.scheduledFor, TRIP_COLS.createdAt, 'completed_at',
         ].join(', '))
         .eq(TRIP_COLS.driverId, user.id)
+        .not(TRIP_COLS.status, 'in', '(pending,no_driver)')
         .order(TRIP_COLS.createdAt, { ascending: false })
         .limit(200);
       if (e) throw e;
@@ -89,7 +90,7 @@ export default function TripsScreen() {
         if (row[TRIP_COLS.status] === 'completed') { totalEarned += Number(fare) || 0; completedCount++; }
         return {
           id:            row.id,
-          name:          row[TRIP_COLS.customerName] ?? 'Passenger',
+          name:          row[TRIP_COLS.customerName] || 'Passenger',
           phone:         row[TRIP_COLS.customerPhone] ?? '',
           pickup:        row[TRIP_COLS.pickupAddress]  ?? '',
           dropoff:       row[TRIP_COLS.dropoffAddress] ?? '',
@@ -97,8 +98,8 @@ export default function TripsScreen() {
           dist:          row[TRIP_COLS.distanceKm] != null ? `${Number(row[TRIP_COLS.distanceKm]).toFixed(1)} km` : '',
           status:        row[TRIP_COLS.status] ?? 'completed',
           paymentMethod: row[TRIP_COLS.paymentMethod] ?? '',
-          time:          relativeTime(row[TRIP_COLS.createdAt]),
-          completedAt:   row.completed_at ? relativeTime(row.completed_at) : '',
+          time:          formatTripDateTime(row[TRIP_COLS.createdAt]),
+          completedAt:   row.completed_at ? formatTripDateTime(row.completed_at) : '',
           scheduledFor:  row[TRIP_COLS.scheduledFor] ?? null,
         };
       });
@@ -289,7 +290,9 @@ const TripRow = memo(function TripRow({ trip, index = 0, onPress }) {
               )}
               {!!trip.paymentMethod && (
                 <Text style={[styles.footerItem, { color: colors.textMuted }]}>
-                  {PAYMENT_ICONS[trip.paymentMethod] ?? ''} {trip.paymentMethod === 'debt' ? 'Account' : trip.paymentMethod.charAt(0).toUpperCase() + trip.paymentMethod.slice(1)}
+                  {trip.paymentMethod.startsWith('split|')
+                    ? '🔀 Split'
+                    : `${PAYMENT_ICONS[trip.paymentMethod] ?? ''} ${trip.paymentMethod === 'debt' ? 'Account' : trip.paymentMethod.charAt(0).toUpperCase() + trip.paymentMethod.slice(1)}`}
                 </Text>
               )}
               <Text style={[styles.footerChevron, { color: colors.textDisabled }]}>›</Text>

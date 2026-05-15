@@ -8,15 +8,17 @@ import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
+import { formatScheduledTime } from '../utils/dateUtils';
 import { FONTS, RADIUS } from '../theme';
 
 const STATUS_CONFIG = {
-  pending:   { labelKey: 'statusPending',   color: 'yellow', icon: '⏳' },
-  accepted:  { labelKey: 'statusAccepted',  color: 'yellow', icon: '🚕' },
-  picked_up: { labelKey: 'statusPickedUp',  color: 'green',  icon: '🟢' },
-  completed: { labelKey: 'statusCompleted', color: 'green',  icon: '✓'  },
-  no_show:   { labelKey: 'statusNoShow',    color: 'red',    icon: '👻' },
-  cancelled: { labelKey: 'statusCancelled', color: 'red',    icon: '✕'  },
+  scheduled: { labelKey: 'filterScheduled',  color: 'yellow', icon: '🕐' },
+  pending:   { labelKey: 'statusPending',    color: 'yellow', icon: '⏳' },
+  accepted:  { labelKey: 'statusAccepted',   color: 'yellow', icon: '🚕' },
+  picked_up: { labelKey: 'statusPickedUp',   color: 'green',  icon: '🟢' },
+  completed: { labelKey: 'statusCompleted',  color: 'green',  icon: '✓'  },
+  no_show:   { labelKey: 'statusNoShow',     color: 'red',    icon: '👻' },
+  cancelled: { labelKey: 'statusCancelled',  color: 'red',    icon: '✕'  },
 };
 
 const PAYMENT_CONFIG = {
@@ -115,10 +117,18 @@ export default function TripDetailModal({ trip, visible, onClose }) {
               <Text style={[styles.fare, { color: accent }]}>{trip.fare || '—'}</Text>
 
               {/* Customer + time */}
-              <Text style={[styles.heroName, { color: colors.textPrimary }]}>{trip.name}</Text>
-              <Text style={[styles.heroTime, { color: colors.textMuted }]}>{trip.time}</Text>
+              <Text style={[styles.heroName, { color: colors.textPrimary }]}>
+                {trip.name && trip.name !== 'Passenger' ? trip.name : '—'}
+              </Text>
+              {trip.status === 'scheduled' && trip.scheduledFor ? (
+                <Text style={[styles.heroTime, { color: accent }]}>
+                  🕐 {formatScheduledTime(trip.scheduledFor)}
+                </Text>
+              ) : (
+                <Text style={[styles.heroTime, { color: colors.textMuted }]}>{trip.time}</Text>
+              )}
 
-              {/* Info chips — no duplicate time */}
+              {/* Info chips */}
               <View style={styles.chips}>
                 {!!trip.dist && (
                   <View style={[styles.chip, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)' }]}>

@@ -185,14 +185,13 @@ export default function HomeScreen() {
           </FadeInView>
         )}
 
-        {isOnline && scheduledTrips.length > 0 && (
-          <FadeInView delay={140} distance={16}>
+        {driverState === DRIVER_STATE.SCANNING && <FadeInView delay={160} distance={16}><ScanningRadar /></FadeInView>}
+
+        {driverState === DRIVER_STATE.SCANNING && isOnline && scheduledTrips.length > 0 && (
+          <FadeInView delay={180} distance={16}>
             <UpcomingTrips trips={scheduledTrips} />
           </FadeInView>
         )}
-
-
-        {driverState === DRIVER_STATE.SCANNING && <FadeInView delay={160} distance={16}><ScanningRadar /></FadeInView>}
         {driverState === DRIVER_STATE.ACTIVE   && activeTrip && (
           <FadeInView delay={160} distance={16}>
             <ActiveTrip

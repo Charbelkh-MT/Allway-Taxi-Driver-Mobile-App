@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, FlatList, Dimensions } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 import { FONTS, RADIUS } from '../theme';
 import { timeUntil, formatScheduledTime } from '../utils/dateUtils';
 
-const LARGE_GROUP_THRESHOLD = 6;
-const ORANGE = '#F5A623';
+const { width: SCREEN_W }      = Dimensions.get('window');
+const LARGE_GROUP_THRESHOLD    = 6;
+const ORANGE                   = '#F5A623';
 
 function UpcomingCard({ trip, colors, isDark, t }) {
   const isLargeGroup = (trip.groupSize ?? 0) > LARGE_GROUP_THRESHOLD;
@@ -43,7 +44,9 @@ function UpcomingCard({ trip, colors, isDark, t }) {
 
         {/* Footer */}
         <View style={[styles.footer, { borderTopColor: colors.border }]}>
-          <Text style={[styles.customer, { color: colors.textMuted }]}>👤  {trip.customerFull || trip.customer}</Text>
+          <Text style={[styles.customer, { color: colors.textMuted }]}>
+            👤  {trip.customerFull && trip.customerFull !== 'Customer' ? trip.customerFull : (trip.customer !== 'C.' ? trip.customer : '—')}
+          </Text>
           <Text style={[styles.fare, { color: colors.yellow }]}>{trip.fare}</Text>
         </View>
 
@@ -72,7 +75,9 @@ function UpcomingCard({ trip, colors, isDark, t }) {
 export default function UpcomingTrips({ trips }) {
   const { colors, isDark } = useTheme();
   const { t }              = useLanguage();
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [, setTick]        = useState(0);
+  const flatRef            = useRef(null);
 
   // Refresh countdowns every minute
   useEffect(() => {
@@ -84,34 +89,64 @@ export default function UpcomingTrips({ trips }) {
 
   return (
     <View style={styles.container}>
-      <Text style={[styles.heading, { color: colors.textMuted }]}>{t('upcomingTrips')}</Text>
-      <ScrollView
+      <View style={styles.header}>
+        <Text style={[styles.heading, { color: colors.textMuted }]}>{t('upcomingTrips')}</Text>
+        {trips.length > 1 && (
+          <Text style={[styles.counter, { color: colors.textDisabled }]}>
+            {currentIndex + 1} / {trips.length}
+          </Text>
+        )}
+      </View>
+
+      <FlatList
+        ref={flatRef}
+        data={trips}
+        keyExtractor={item => item.id}
         horizontal
+        pagingEnabled
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.scroll}
-      >
-        {trips.map(trip => (
-          <UpcomingCard
-            key={trip.id}
-            trip={trip}
-            colors={colors}
-            isDark={isDark}
-            t={t}
-          />
-        ))}
-      </ScrollView>
+        decelerationRate="fast"
+        onMomentumScrollEnd={e => {
+          const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_W);
+          setCurrentIndex(Math.min(Math.max(idx, 0), trips.length - 1));
+        }}
+        renderItem={({ item }) => (
+          <View style={styles.page}>
+            <UpcomingCard trip={item} colors={colors} isDark={isDark} t={t} />
+          </View>
+        )}
+      />
+
+      {trips.length > 1 && (
+        <View style={styles.dots}>
+          {trips.map((_, i) => (
+            <View
+              key={i}
+              style={[
+                styles.dot_indicator,
+                {
+                  backgroundColor: i === currentIndex ? colors.yellow : colors.border,
+                  width: i === currentIndex ? 18 : 7,
+                },
+              ]}
+            />
+          ))}
+        </View>
+      )}
     </View>
   );
 }
 
-const CARD_W = 300;
-
 const styles = StyleSheet.create({
   container: { paddingTop: 18 },
-  heading:   { fontSize: 10, fontFamily: FONTS.extraBold, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 12, paddingHorizontal: 18 },
-  scroll:    { paddingHorizontal: 18, gap: 12 },
 
-  card:       { width: CARD_W, flexDirection: 'row', borderWidth: 1, borderRadius: RADIUS.xl, overflow: 'hidden' },
+  header:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, marginBottom: 12 },
+  heading: { fontSize: 10, fontFamily: FONTS.extraBold, letterSpacing: 1.2, textTransform: 'uppercase' },
+  counter: { fontSize: 11, fontFamily: FONTS.semiBold },
+
+  page: { width: SCREEN_W, paddingHorizontal: 18 },
+
+  card:       { flexDirection: 'row', borderWidth: 1, borderRadius: RADIUS.xl, overflow: 'hidden' },
   shadow:     { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2 },
   cardAccent: { width: 4 },
   cardBody:   { flex: 1, padding: 14, gap: 10 },
@@ -137,4 +172,7 @@ const styles = StyleSheet.create({
   notes:      { borderWidth: 1, borderRadius: RADIUS.md, padding: 10, gap: 4 },
   notesLabel: { fontSize: 10, fontFamily: FONTS.extraBold, letterSpacing: 0.5 },
   notesText:  { fontSize: 12, fontFamily: FONTS.semiBold, lineHeight: 18 },
+
+  dots:          { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: 12 },
+  dot_indicator: { height: 7, borderRadius: 4 },
 });
