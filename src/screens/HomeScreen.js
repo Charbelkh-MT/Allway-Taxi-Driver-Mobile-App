@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef, memo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Platform, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Platform, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -14,10 +14,10 @@ import MiniEarningsChart from '../components/MiniEarningsChart';
 import QuickActions from '../components/QuickActions';
 import ScanningRadar from '../components/ScanningRadar';
 import ActiveTrip from '../components/ActiveTrip';
-import AvailableTripsSheet from '../components/AvailableTripsSheet';
 import ShiftSummaryModal from '../components/ShiftSummaryModal';
 import SosButton from '../components/SosButton';
 import UpcomingTrips from '../components/UpcomingTrips';
+import AvailableTripsInline from '../components/AvailableTripsInline';
 import TripDetailModal from '../components/TripDetailModal';
 import { registerForPushNotificationsAsync } from '../utils/notifications';
 import { SkeletonChart } from '../components/Skeleton';
@@ -33,15 +33,13 @@ export default function HomeScreen() {
     availableTrips, shiftTime, shiftSeconds, isOnline,
     cashCollected, scheduledTrips, buildShiftSummary,
     goOnline, goOffline, acceptTrip, completeTrip,
-    pickUpPassenger, markNoShow, cancelTrip, openTripSheet,
+    pickUpPassenger, markNoShow, cancelTrip, openTripSheet, dismissTrip,
   } = useDriver();
 
-  const [showAvailableSheet,    setShowAvailableSheet]    = useState(false);
   const [showSummary,           setShowSummary]            = useState(false);
   const [summaryData,           setSummaryData]            = useState(null);
   const [selectedScheduledTrip, setSelectedScheduledTrip] = useState(null);
-  const [summaryLoading,      setSummaryLoading]       = useState(false);
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const [summaryLoading,        setSummaryLoading]         = useState(false);
 
   async function initiateEndShift() {
     setSummaryData(null);
@@ -51,16 +49,6 @@ export default function HomeScreen() {
     setSummaryData(data);
     setSummaryLoading(false);
   }
-
-  useEffect(() => {
-    if (availableTrips.length === 0) { pulseAnim.setValue(1); return; }
-    const loop = Animated.loop(Animated.sequence([
-      Animated.timing(pulseAnim, { toValue: 1.1, duration: 700, useNativeDriver: true }),
-      Animated.timing(pulseAnim, { toValue: 1,   duration: 700, useNativeDriver: true }),
-    ]));
-    loop.start();
-    return () => loop.stop();
-  }, [availableTrips.length]);
 
   const firstName = useMemo(() => (driver.name ?? 'Driver').split(' ')[0], [driver.name]);
 
@@ -187,7 +175,18 @@ export default function HomeScreen() {
           </FadeInView>
         )}
 
-        {driverState === DRIVER_STATE.SCANNING && <FadeInView delay={160} distance={16}><ScanningRadar /></FadeInView>}
+        {driverState === DRIVER_STATE.SCANNING && availableTrips.length === 0 && (
+          <FadeInView delay={160} distance={16}><ScanningRadar /></FadeInView>
+        )}
+        {driverState === DRIVER_STATE.SCANNING && availableTrips.length > 0 && (
+          <FadeInView delay={160} distance={16}>
+            <AvailableTripsInline
+              trips={availableTrips}
+              onAccept={acceptTrip}
+              onDismiss={dismissTrip}
+            />
+          </FadeInView>
+        )}
 
         {driverState === DRIVER_STATE.SCANNING && isOnline && scheduledTrips.length > 0 && (
           <FadeInView delay={180} distance={16}>
@@ -240,42 +239,7 @@ export default function HomeScreen() {
         onClose={() => setSelectedScheduledTrip(null)}
       />
 
-      {showAvailableSheet && (
-        <AvailableTripsSheet
-          trips={availableTrips}
-          onAccept={(trip) => { setShowAvailableSheet(false); acceptTrip(trip); }}
-          onClose={() => setShowAvailableSheet(false)}
-        />
-      )}
 
-      {isOnline && availableTrips.filter(t => !t.createdAt || (Date.now() - new Date(t.createdAt).getTime()) / 1000 < 84).length > 0 && !showTripSheet && driverState !== DRIVER_STATE.ACTIVE && (
-        <Animated.View collapsable={false} style={[styles.floatWrap, { transform: [{ scale: pulseAnim }] }]}>
-          <TouchableOpacity
-            style={[styles.floatBtn, { backgroundColor: colors.yellow }]}
-            onPress={() => {
-              const validTrips = availableTrips.filter(t => {
-                if (!t.createdAt) return true;
-                return (Date.now() - new Date(t.createdAt).getTime()) / 1000 < 84;
-              });
-              if (validTrips.length === 0) return;
-              if (validTrips.length === 1) {
-                openTripSheet(validTrips[0]);
-              } else {
-                setShowAvailableSheet(true);
-              }
-            }}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.floatIcon}>🚕</Text>
-            <Text style={styles.floatText}>
-              {availableTrips.length} {availableTrips.length === 1 ? t('tripAvailable') : t('tripsAvailable')}
-            </Text>
-            <View style={styles.floatBadge}>
-              <Text style={styles.floatBadgeText}>{availableTrips.length}</Text>
-            </View>
-          </TouchableOpacity>
-        </Animated.View>
-      )}
     </View>
   );
 }

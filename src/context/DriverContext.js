@@ -245,14 +245,9 @@ export function DriverProvider({ children }) {
     if (driverState === DRIVER_STATE.OFFLINE) return;
 
     const cleanup = setInterval(async () => {
-      // Drop trips whose 84s countdown has expired
-      setAvailableTrips(prev => prev.filter(t => {
-        if (!t.createdAt) return true;
-        const elapsed = (Date.now() - new Date(t.createdAt).getTime()) / 1000;
-        return elapsed < 84;
-      }));
-
-      // Re-sync to catch trips claimed by other drivers
+      // Re-sync from DB every 8s — this is the source of truth for what's still
+      // unclaimed. Trips taken by other drivers disappear; trips the driver hasn't
+      // decided on yet remain visible until someone claims them.
       await syncPendingTrips();
     }, 8000);
 
@@ -971,6 +966,13 @@ export function DriverProvider({ children }) {
     setPendingTrip(null);
   }
 
+  // Removes a trip from the local available list without touching the DB.
+  // Used when the driver taps Decline on the inline list — the trip stays
+  // in the DB so other drivers can still claim it.
+  function dismissTrip(tripId) {
+    setAvailableTrips(prev => prev.filter(t => t.id !== tripId));
+  }
+
   return (
     <DriverContext.Provider
       value={{
@@ -995,6 +997,7 @@ export function DriverProvider({ children }) {
         completeTrip,
         openTripSheet,
         closeTripSheet,
+        dismissTrip,
       }}
     >
       {children}
