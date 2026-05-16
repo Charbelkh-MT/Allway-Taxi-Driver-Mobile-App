@@ -124,7 +124,7 @@ export default function AccountScreen() {
   async function handlePhotoUpload() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission required', 'Please allow photo library access to upload a profile picture.');
+      Alert.alert(t('photoPermissionTitle'), t('photoPermissionMsg'));
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -153,12 +153,12 @@ export default function AccountScreen() {
 
       const { data: { publicUrl } } = supabase.storage.from('driver-photos').getPublicUrl(path);
 
-      await supabase.from('drivers').update({ photo_url: publicUrl }).eq('id', user.id);
+      await supabase.from(TABLE_DRIVERS).update({ [DRIVER_COLS.photoUrl]: publicUrl }).eq(DRIVER_COLS.id, user.id);
       setDriver(prev => ({ ...prev, photoUrl: publicUrl }));
       console.log(`[Profile] Photo uploaded successfully — path: ${path}, url: ${publicUrl}`);
     } catch (e) {
       console.warn('[Profile] Photo upload failed:', e.message);
-      Alert.alert('Upload failed', e.message);
+      Alert.alert(t('uploadFailed'), e.message);
     } finally {
       setUploadingPhoto(false);
     }
@@ -266,7 +266,7 @@ export default function AccountScreen() {
             <InfoRow label={t('phone')}       value={driver.phone}   />
             <InfoRow label={t('carModel')}    value={driver.vehicle} />
             <InfoRow label={t('plate')}       value={driver.plate}   />
-            <InfoRow label="Car Type"         value={driver.carType === 'xl' ? '🚐  XL' : '🚕  Comfort'} />
+            <InfoRow label={t('carType')}      value={driver.carType === 'xl' ? `🚐  ${t('rideXL')}` : `🚕  ${t('rideComfort')}`} />
             <InfoRow label={t('totalTrips')}  value={String(driver.totalTrips)} last />
           </View>
 

@@ -50,7 +50,7 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
   if (bgTick === 1 || bgTick % 15 === 0) {
     ops.push(
       supabase.from(TABLE_DRIVERS)
-        .update({ lat, lng, last_seen: now, heading, speed })
+        .update({ [DRIVER_COLS.lat]: lat, [DRIVER_COLS.lng]: lng, [DRIVER_COLS.lastSeen]: now, [DRIVER_COLS.heading]: heading, [DRIVER_COLS.speed]: speed })
         .eq(DRIVER_COLS.id, cachedUserId)
     );
   }

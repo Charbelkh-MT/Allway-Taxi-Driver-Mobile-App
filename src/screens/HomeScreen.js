@@ -124,9 +124,10 @@ export default function HomeScreen() {
   }, [driverState, fetchWeeklyEarnings]);
 
   useEffect(() => {
-    let channel;
+    let channel = null;
+    let active  = true;
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return;
+      if (!active || !user) return;
       channel = supabase
         .channel(`home-trips-${user.id}`)
         .on('postgres_changes', {
@@ -137,8 +138,8 @@ export default function HomeScreen() {
         }, fetchWeeklyEarnings)
         .subscribe();
     });
-    return () => { if (channel) supabase.removeChannel(channel); };
-  }, [fetchWeeklyEarnings]);
+    return () => { active = false; if (channel) supabase.removeChannel(channel); };
+  }, []); // Empty deps — channel subscribes once; fetchWeeklyEarnings is stable via useCallback
 
   const earningsChart = useMemo(() => {
     if (earningsLoading) return <SkeletonChart />;
@@ -274,15 +275,18 @@ export default function HomeScreen() {
 
 const GreetingHeader = memo(function GreetingHeader({ name, earned, trips, rating, loading }) {
   const { colors } = useTheme();
-  const { t, isRTL } = useLanguage();
+  const { t, isRTL, language } = useLanguage();
   const hour     = new Date().getHours();
   const greeting = useMemo(
     () => hour < 12 ? t('goodMorning') : hour < 17 ? t('goodAfternoon') : t('goodEvening'),
     [hour, t]
   );
   const dateStr = useMemo(
-    () => new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
-    [hour]
+    () => new Date().toLocaleDateString(
+      language === 'ar' ? 'ar-u-nu-latn' : 'en-US',
+      { weekday: 'long', month: 'long', day: 'numeric' }
+    ),
+    [hour, language]
   );
 
   const stats = [

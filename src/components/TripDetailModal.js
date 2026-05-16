@@ -22,16 +22,16 @@ const STATUS_CONFIG = {
 };
 
 const PAYMENT_CONFIG = {
-  cash:   { icon: '💵', label: 'Cash'    },
-  card:   { icon: '💳', label: 'Card'    },
-  debt:   { icon: '📋', label: 'Account' },
-  wish:   { icon: '💙', label: 'Whish'   },
-  wallet: { icon: '💰', label: 'Wallet'  },
+  cash:   { icon: '💵', labelKey: 'cash'   },
+  card:   { icon: '💳', labelKey: 'card'   },
+  debt:   { icon: '📋', labelKey: 'debt'   },
+  wish:   { icon: '💙', labelKey: 'wish'   },
+  wallet: { icon: '💰', labelKey: 'wallet' },
 };
 
 export default function TripDetailModal({ trip, visible, onClose }) {
   const { colors, isDark } = useTheme();
-  const { t, isRTL } = useLanguage();
+  const { t, isRTL, language } = useLanguage();
   const insets    = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(800)).current;
   const fadeAnim  = useRef(new Animated.Value(0)).current;
@@ -59,8 +59,10 @@ export default function TripDetailModal({ trip, visible, onClose }) {
   const cfg      = { ...cfgRaw, label: t(cfgRaw.labelKey) };
   const accent   = colors[cfg.color];
   const pay      = trip.paymentMethod?.startsWith('split|')
-    ? { icon: '🔀', label: 'Split' }
-    : PAYMENT_CONFIG[trip.paymentMethod];
+    ? { icon: '🔀', label: t('splitPayment') }
+    : PAYMENT_CONFIG[trip.paymentMethod]
+      ? { ...PAYMENT_CONFIG[trip.paymentMethod], label: t(PAYMENT_CONFIG[trip.paymentMethod].labelKey) }
+      : null;
 
   // Context-aware actions based on status
   const isAccepted   = trip.status === 'accepted';
@@ -122,7 +124,7 @@ export default function TripDetailModal({ trip, visible, onClose }) {
               </Text>
               {trip.status === 'scheduled' && trip.scheduledFor ? (
                 <Text style={[styles.heroTime, { color: accent }]}>
-                  🕐 {formatScheduledTime(trip.scheduledFor)}
+                  🕐 {formatScheduledTime(trip.scheduledFor, language)}
                 </Text>
               ) : (
                 <Text style={[styles.heroTime, { color: colors.textMuted }]}>{trip.time}</Text>

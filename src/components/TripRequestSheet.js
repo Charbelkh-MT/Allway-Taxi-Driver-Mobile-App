@@ -160,17 +160,17 @@ export default function TripRequestSheet({ trip, onAccept, onDecline, withSound 
               <View style={styles.badgeRow}>
                 {(trip.groupSize ?? 0) > LARGE_GROUP_THRESHOLD && (
                   <View style={[styles.infoBadge, { backgroundColor: `${ORANGE}15`, borderColor: `${ORANGE}40` }]}>
-                    <Text style={[styles.infoBadgeText, { color: ORANGE }]}>👥  Large group — {trip.groupSize} people</Text>
+                    <Text style={[styles.infoBadgeText, { color: ORANGE }]}>👥  {t('largeGroup')} — {trip.groupSize} {t('people')}</Text>
                   </View>
                 )}
                 {trip.passengerCount > 1 && (trip.groupSize ?? 0) <= LARGE_GROUP_THRESHOLD && (
                   <View style={[styles.infoBadge, { backgroundColor: `${colors.yellow}15`, borderColor: `${colors.yellow}40` }]}>
-                    <Text style={[styles.infoBadgeText, { color: colors.yellow }]}>👥  {trip.passengerCount} passengers</Text>
+                    <Text style={[styles.infoBadgeText, { color: colors.yellow }]}>👥  {trip.passengerCount} {t('passengers')}</Text>
                   </View>
                 )}
                 {trip.allowDebt && (
                   <View style={[styles.infoBadge, { backgroundColor: `${colors.red}15`, borderColor: `${colors.red}40` }]}>
-                    <Text style={[styles.infoBadgeText, { color: colors.red }]}>📋  Credit Account</Text>
+                    <Text style={[styles.infoBadgeText, { color: colors.red }]}>📋  {t('creditAccount')}</Text>
                   </View>
                 )}
               </View>
@@ -178,7 +178,7 @@ export default function TripRequestSheet({ trip, onAccept, onDecline, withSound 
 
             {!!trip.notes && (
               <View style={[styles.notesBlock, { backgroundColor: `${ORANGE}10`, borderColor: `${ORANGE}35` }]}>
-                <Text style={[styles.notesLabel, { color: ORANGE }]}>📋  Dispatcher Notes</Text>
+                <Text style={[styles.notesLabel, { color: ORANGE }]}>📋  {t('dispatcherNotes')}</Text>
                 <Text style={[styles.notesText, { color: colors.textSecondary }]}>{trip.notes}</Text>
               </View>
             )}

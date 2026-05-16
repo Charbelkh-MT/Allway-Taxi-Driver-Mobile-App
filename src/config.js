@@ -200,6 +200,7 @@ export const TRIP_COLS = {
   pickupAt:           'pickup_at',
   durationMin:        'duration_min',
   customerRating:     'customer_rating',
+  completedAt:        'completed_at',
   createdAt:          'requested_at',
   scheduledFor:       'scheduled_for',
   groupSize:          'group_size',
@@ -223,4 +224,10 @@ export const DRIVER_COLS = {
   status:      'status',
   carType:     'car_type',
   online:      'online',
+  // Location fields — used by GPS watchers and background task
+  lat:         'lat',
+  lng:         'lng',
+  heading:     'heading',
+  speed:       'speed',
+  lastSeen:    'last_seen',
 };

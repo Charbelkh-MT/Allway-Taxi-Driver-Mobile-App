@@ -57,7 +57,7 @@ const emptyStyles = StyleSheet.create({
 export default function TripsScreen() {
   const { colors }  = useTheme();
   const { isOnline } = useDriver();
-  const { t, isRTL } = useLanguage();
+  const { t, isRTL, language } = useLanguage();
   const [filter, setFilter]           = useState('all');
   const [trips, setTrips]             = useState([]);
   const [stats, setStats]             = useState({ total: 0, earned: 0, completed: 0 });
@@ -98,8 +98,8 @@ export default function TripsScreen() {
           dist:          row[TRIP_COLS.distanceKm] != null ? `${Number(row[TRIP_COLS.distanceKm]).toFixed(1)} km` : '',
           status:        row[TRIP_COLS.status] ?? 'completed',
           paymentMethod: row[TRIP_COLS.paymentMethod] ?? '',
-          time:          formatTripDateTime(row[TRIP_COLS.createdAt]),
-          completedAt:   row.completed_at ? formatTripDateTime(row.completed_at) : '',
+          time:          formatTripDateTime(row[TRIP_COLS.createdAt], language),
+          completedAt:   row.completed_at ? formatTripDateTime(row.completed_at, language) : '',
           scheduledFor:  row[TRIP_COLS.scheduledFor] ?? null,
         };
       });
@@ -232,7 +232,7 @@ const PAYMENT_ICONS = { cash: '💵', card: '💳', debt: '📋' };
 
 const TripRow = memo(function TripRow({ trip, index = 0, onPress }) {
   const { colors, isDark } = useTheme();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const cfgRaw   = STATUS_CONFIG[trip.status] || STATUS_CONFIG.completed;
   const cfg      = { ...cfgRaw, label: t(cfgRaw.labelKey) };
   const color    = colors[cfg.accentKey];
@@ -257,7 +257,7 @@ const TripRow = memo(function TripRow({ trip, index = 0, onPress }) {
               <Text style={[styles.cardName, { color: colors.textPrimary }]}>{trip.name}</Text>
               {trip.status === 'scheduled' && trip.scheduledFor ? (
                 <Text style={[styles.cardTime, { color: colors.yellow }]}>
-                  🕐 {formatScheduledTime(trip.scheduledFor)}
+                  🕐 {formatScheduledTime(trip.scheduledFor, language)}
                 </Text>
               ) : (
                 <Text style={[styles.cardTime, { color: colors.textMuted }]}>{trip.time}</Text>
@@ -291,8 +291,8 @@ const TripRow = memo(function TripRow({ trip, index = 0, onPress }) {
               {!!trip.paymentMethod && (
                 <Text style={[styles.footerItem, { color: colors.textMuted }]}>
                   {trip.paymentMethod.startsWith('split|')
-                    ? '🔀 Split'
-                    : `${PAYMENT_ICONS[trip.paymentMethod] ?? ''} ${trip.paymentMethod === 'debt' ? 'Account' : trip.paymentMethod.charAt(0).toUpperCase() + trip.paymentMethod.slice(1)}`}
+                    ? `🔀 ${t('splitPayment')}`
+                    : `${PAYMENT_ICONS[trip.paymentMethod] ?? ''} ${t(trip.paymentMethod) || trip.paymentMethod}`}
                 </Text>
               )}
               <Text style={[styles.footerChevron, { color: colors.textDisabled }]}>›</Text>

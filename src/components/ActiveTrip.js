@@ -8,15 +8,22 @@ import { formatTime } from '../utils/dateUtils';
 import { FONTS, RADIUS } from '../theme';
 import PaymentModal from './PaymentModal';
 
-function formatPaymentLabel(method) {
+function formatPaymentLabel(method, t) {
   if (!method) return '';
+  const icons = { cash: '💵', card: '💳', wish: '💙', wallet: '💰', debt: '📋' };
   if (method.startsWith('split|')) {
-    const [, m1, a1, m2, a2] = method.split('|');
-    const icons = { cash: '💵', card: '💳', wish: '💙', wallet: '💰', debt: '📋' };
-    return `${icons[m1] ?? '💵'} $${parseFloat(a1).toFixed(0)}  +  ${icons[m2] ?? '💳'} $${parseFloat(a2).toFixed(0)}`;
+    try {
+      const parts = method.split('|');
+      if (parts.length < 5) return t ? t('splitPayment') : 'Split';
+      const [, m1, a1, m2, a2] = parts;
+      const amt1 = parseFloat(a1), amt2 = parseFloat(a2);
+      if (isNaN(amt1) || isNaN(amt2)) return t ? t('splitPayment') : 'Split';
+      const l1 = t ? t(m1) : m1, l2 = t ? t(m2) : m2;
+      return `${icons[m1] ?? '💵'} ${l1} $${amt1.toFixed(0)}  +  ${icons[m2] ?? '💳'} ${l2} $${amt2.toFixed(0)}`;
+    } catch { return t ? t('splitPayment') : 'Split'; }
   }
-  const LABELS = { cash: '💵 Cash', card: '💳 Card', wish: '💙 Wish', wallet: '💰 Wallet', debt: '📋 Account' };
-  return LABELS[method] ?? method;
+  const label = t ? `${icons[method] ?? ''} ${t(method)}` : `${icons[method] ?? ''} ${method}`;
+  return label.trim();
 }
 
 function TripSuccessOverlay({ visible, trip, paymentMethod, onDone }) {
@@ -72,7 +79,7 @@ function TripSuccessOverlay({ visible, trip, paymentMethod, onDone }) {
             <Text style={[successStyles.fare, { color: colors.green }]}>{trip?.fare}</Text>
             <View style={[successStyles.paymentChip, { backgroundColor: colors.bgCard, borderColor: colors.border }]}>
               <Text style={[successStyles.paymentText, { color: colors.textSecondary }]}>
-                {formatPaymentLabel(paymentMethod)}
+                {formatPaymentLabel(paymentMethod, t)}
               </Text>
             </View>
           </View>
@@ -180,7 +187,7 @@ export default function ActiveTrip({ trip, onComplete, onPickUp, onNoShow, onCan
   async function callCustomer() {
     const url = `tel:${trip.phone}`;
     if (await Linking.canOpenURL(url)) await Linking.openURL(url);
-    else Alert.alert('Call', trip.phone);
+    else Alert.alert(t('call'), trip.phone);
   }
 
   async function openMaps(address) {

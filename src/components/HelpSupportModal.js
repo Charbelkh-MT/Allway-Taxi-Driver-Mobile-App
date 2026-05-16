@@ -71,10 +71,12 @@ export default function HelpSupportModal({ visible, onClose }) {
 
   async function handleWhatsApp() {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const url = `whatsapp://send?phone=${WHATSAPP_NUMBER.replace(/\s|\+/g, '')}`;
-    const can = await Linking.canOpenURL(url);
-    if (can) Linking.openURL(url);
-    else Alert.alert('WhatsApp', `Send a message to ${WHATSAPP_NUMBER}`);
+    // wa.me opens WhatsApp app if installed, falls back to WhatsApp Web otherwise
+    const phone = WHATSAPP_NUMBER.replace(/[\s\-\+\(\)]/g, '');
+    const url   = `https://wa.me/${phone}`;
+    Linking.openURL(url).catch(() =>
+      Alert.alert('WhatsApp', `Could not open WhatsApp. Number: ${WHATSAPP_NUMBER}`)
+    );
   }
 
   return (
@@ -108,7 +110,6 @@ export default function HelpSupportModal({ visible, onClose }) {
             >
               <Text style={styles.contactIcon}>📞</Text>
               <Text style={[styles.contactLabel, { color: colors.green }]}>{t('callSupport')}</Text>
-              <Text style={[styles.contactSub, { color: colors.textMuted }]}>{SUPPORT_PHONE}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -118,7 +119,6 @@ export default function HelpSupportModal({ visible, onClose }) {
             >
               <Text style={styles.contactIcon}>💬</Text>
               <Text style={[styles.contactLabel, { color: colors.yellow }]}>WhatsApp</Text>
-              <Text style={[styles.contactSub, { color: colors.textMuted }]}>{WHATSAPP_NUMBER}</Text>
             </TouchableOpacity>
           </View>
 

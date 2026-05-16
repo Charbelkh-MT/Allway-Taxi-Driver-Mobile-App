@@ -163,7 +163,7 @@ async function startForegroundTracking(cachedUserId) {
         if (gpsTick === 1 || gpsTick % 15 === 0) {
           ops.push(
             supabase.from(TABLE_DRIVERS)
-              .update({ lat, lng, last_seen: now, heading, speed })
+              .update({ [DRIVER_COLS.lat]: lat, [DRIVER_COLS.lng]: lng, [DRIVER_COLS.lastSeen]: now, [DRIVER_COLS.heading]: heading, [DRIVER_COLS.speed]: speed })
               .eq(DRIVER_COLS.id, cachedUserId)
           );
         }
@@ -193,7 +193,7 @@ async function stopForegroundTracking() {
         { onConflict: 'driver_id' }
       );
       await supabase.from(TABLE_DRIVERS)
-        .update({ [DRIVER_COLS.online]: false, last_seen: now, [DRIVER_COLS.status]: 'offline' })
+        .update({ [DRIVER_COLS.online]: false, [DRIVER_COLS.lastSeen]: now, [DRIVER_COLS.status]: 'offline' })
         .eq(DRIVER_COLS.id, userId);
     }
   } catch (e) { console.warn('[GPS] Offline mark error:', e.message); }
@@ -508,6 +508,23 @@ export function DriverProvider({ children }) {
             return;
           }
 
+          // CRM cancelled or forcefully modified the driver's active trip
+          if (
+            driverId === userIdRef.current &&
+            (status === 'cancelled' || status === 'no_show') &&
+            row?.id === activeTripIdRef.current
+          ) {
+            activeTripIdRef.current = null;
+            setActiveTrip(null);
+            setDriverState(DRIVER_STATE.SCANNING);
+            try { await AsyncStorage.removeItem(ACTIVE_TRIP_STORAGE_KEY); } catch {}
+            Alert.alert(
+              'Trip Cancelled',
+              'Your active trip was cancelled by the dispatcher. You are now scanning for new trips.'
+            );
+            return;
+          }
+
           // Remove from upcoming list if trip was cancelled or modified
           if (driverId === userIdRef.current && status !== 'scheduled') {
             setScheduledTrips(prev => prev.filter(t => t.id !== row?.id));
@@ -518,11 +535,20 @@ export function DriverProvider({ children }) {
           if (status && status !== 'pending') await syncPendingTrips();
         }
       )
-      // DELETE — payload.old is unreliable; always re-sync both queues
+      // DELETE — payload.old is unreliable; re-sync both queues.
+      // Also clear active trip if it was hard-deleted by CRM (rare but possible).
       .on(
         'postgres_changes',
         { event: 'DELETE', schema: 'public', table: TABLE_TRIPS },
-        async () => {
+        async (payload) => {
+          const deletedId = payload.old?.id;
+          if (deletedId && deletedId === activeTripIdRef.current) {
+            activeTripIdRef.current = null;
+            setActiveTrip(null);
+            setDriverState(DRIVER_STATE.SCANNING);
+            try { await AsyncStorage.removeItem(ACTIVE_TRIP_STORAGE_KEY); } catch {}
+            Alert.alert('Trip Removed', 'Your active trip was removed. You are now scanning for new trips.');
+          }
           await syncPendingTrips();
           await fetchScheduledTrips();
         }
@@ -843,7 +869,7 @@ export function DriverProvider({ children }) {
           .update({
             [TRIP_COLS.driverId]: userId,
             [TRIP_COLS.status]:   'accepted',
-            accepted_at:          new Date().toISOString(),
+            [TRIP_COLS.acceptedAt]: new Date().toISOString(),
           })
           .eq(TRIP_COLS.id,     resolved.id)
           .eq(TRIP_COLS.status, 'pending')
@@ -996,7 +1022,7 @@ export function DriverProvider({ children }) {
         [TRIP_COLS.paymentMethod]:  normalizedMethod,
         [TRIP_COLS.durationMin]:    durationMin,
         [TRIP_COLS.distanceKm]:     distanceKm,
-        completed_at:               new Date().toISOString(),
+        [TRIP_COLS.completedAt]:    new Date().toISOString(),
         ...(customerRating ? { [TRIP_COLS.customerRating]: customerRating } : {}),
       };
       try {

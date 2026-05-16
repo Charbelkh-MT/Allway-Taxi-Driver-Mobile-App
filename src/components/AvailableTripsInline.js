@@ -53,12 +53,12 @@ function TripCard({ trip, onAccept, onDismiss, colors, isDark, t }) {
           <View style={styles.badges}>
             {trip.passengerCount > 1 && (
               <View style={[styles.badge, { backgroundColor: `${colors.yellow}15`, borderColor: `${colors.yellow}35` }]}>
-                <Text style={[styles.badgeText, { color: colors.yellow }]}>👥 {trip.passengerCount} passengers</Text>
+                <Text style={[styles.badgeText, { color: colors.yellow }]}>👥 {trip.passengerCount} {t('passengers')}</Text>
               </View>
             )}
             {trip.allowDebt && (
               <View style={[styles.badge, { backgroundColor: `${colors.red}15`, borderColor: `${colors.red}35` }]}>
-                <Text style={[styles.badgeText, { color: colors.red }]}>📋 Credit Account</Text>
+                <Text style={[styles.badgeText, { color: colors.red }]}>📋 {t('creditAccount')}</Text>
               </View>
             )}
           </View>
@@ -75,11 +75,11 @@ function TripCard({ trip, onAccept, onDismiss, colors, isDark, t }) {
         <View style={styles.actions}>
           <TouchableOpacity
             onPress={() => Alert.alert(
-              'Decline Trip?',
-              `Are you sure you want to decline the trip from ${trip.pickup}?`,
+              t('declineTripQ'),
+              t('declineTripConfirm'),
               [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Decline', style: 'destructive', onPress: async () => {
+                { text: t('cancel'), style: 'cancel' },
+                { text: t('decline'), style: 'destructive', onPress: async () => {
                   await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                   onDismiss(trip.id);
                 }},
@@ -93,11 +93,11 @@ function TripCard({ trip, onAccept, onDismiss, colors, isDark, t }) {
 
           <TouchableOpacity
             onPress={() => Alert.alert(
-              'Accept Trip?',
+              t('acceptTripQ'),
               `${trip.pickup} → ${trip.dropoff}  ·  ${trip.fare}`,
               [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Accept', onPress: async () => {
+                { text: t('cancel'), style: 'cancel' },
+                { text: t('accept'), onPress: async () => {
                   await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                   onAccept(trip);
                 }},

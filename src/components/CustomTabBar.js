@@ -5,7 +5,14 @@ import Svg, { Path, Circle, Polyline } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { BlurView } from 'expo-blur';
 import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 import { FONTS } from '../theme';
+
+const TAB_LABEL_KEYS = {
+  Home:    'tabHome',
+  Trips:   'tabTrips',
+  Account: 'tabAccount',
+};
 
 function HomeIcon({ active, color }) {
   return (
@@ -41,7 +48,7 @@ function AccountIcon({ active, color }) {
 
 const TAB_ICONS = { Home: HomeIcon, Trips: TripsIcon, Account: AccountIcon };
 
-function TabItem({ route, index, isFocused, navigation, colors }) {
+function TabItem({ route, index, isFocused, navigation, colors, t }) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const dotAnim   = useRef(new Animated.Value(isFocused ? 1 : 0)).current;
 
@@ -76,7 +83,7 @@ function TabItem({ route, index, isFocused, navigation, colors }) {
     <TouchableOpacity onPress={onPress} style={styles.tab} activeOpacity={1}>
       <Animated.View style={{ transform: [{ scale: scaleAnim }], alignItems: 'center' }}>
         <Icon active={isFocused} color={color} />
-        <Text style={[styles.label, { color }]}>{route.name}</Text>
+        <Text style={[styles.label, { color }]}>{t(TAB_LABEL_KEYS[route.name] ?? route.name)}</Text>
       </Animated.View>
       <Animated.View style={[
         styles.activeDot,
@@ -87,8 +94,9 @@ function TabItem({ route, index, isFocused, navigation, colors }) {
 }
 
 export default function CustomTabBar({ state, navigation }) {
-  const insets         = useSafeAreaInsets();
+  const insets             = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
+  const { t }              = useLanguage();
 
   const tabItems = state.routes.map((route, index) => (
     <TabItem
@@ -98,6 +106,7 @@ export default function CustomTabBar({ state, navigation }) {
       isFocused={state.index === index}
       navigation={navigation}
       colors={colors}
+      t={t}
     />
   ));
 

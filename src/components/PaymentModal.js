@@ -180,8 +180,9 @@ function ConfirmationScreen({ method, fare, colors, onConfirm, onBack }) {
 }
 
 function SplitConfirmationScreen({ method1, amount1, method2, amount2, fare, colors, onConfirm, onBack }) {
-  const icons = { cash: '💵', card: '💳', wish: null, wallet: '💰', debt: '📋' };
-  const labels = { cash: 'Cash', card: 'Card', wish: 'Whish', wallet: 'Wallet', debt: 'Account' };
+  const { t } = useLanguage();
+  const icons  = { cash: '💵', card: '💳', wish: null, wallet: '💰', debt: '📋' };
+  const labels = { cash: t('cash'), card: t('card'), wish: t('wish'), wallet: t('wallet'), debt: t('debt') };
 
   return (
     <View style={confirmStyles.container}>

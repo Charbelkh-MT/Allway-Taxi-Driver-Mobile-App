@@ -30,7 +30,7 @@ function UpcomingCard({ trip, colors, isDark, t, onPress }) {
           <View style={styles.cardTopLeft}>
             <Text style={[styles.cardName, { color: colors.textPrimary }]}>{customerName}</Text>
             <Text style={[styles.cardTime, { color: colors.yellow }]}>
-              🕐 {formatScheduledTime(trip.scheduledFor)}
+              🕐 {formatScheduledTime(trip.scheduledFor, language)}
             </Text>
           </View>
           <View style={styles.cardTopRight}>
@@ -57,7 +57,7 @@ function UpcomingCard({ trip, colors, isDark, t, onPress }) {
         {/* Footer — countdown + dist + chevron */}
         <View style={[styles.cardFooter, { borderTopColor: colors.border }]}>
           <View style={[styles.countdownChip, { backgroundColor: `${accent}15`, borderColor: `${accent}30` }]}>
-            <Text style={[styles.countdownText, { color: accent }]}>{timeUntil(trip.scheduledFor)}</Text>
+            <Text style={[styles.countdownText, { color: accent }]}>{timeUntil(trip.scheduledFor, language)}</Text>
           </View>
           {!!trip.dist && (
             <Text style={[styles.footerItem, { color: colors.textMuted }]}>📍 {trip.dist}</Text>
@@ -75,7 +75,7 @@ function UpcomingCard({ trip, colors, isDark, t, onPress }) {
 
 export default function UpcomingTrips({ trips, onPressTrip }) {
   const { colors, isDark } = useTheme();
-  const { t }              = useLanguage();
+  const { t, language }    = useLanguage();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [, setTick]        = useState(0);
 

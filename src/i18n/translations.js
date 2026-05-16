@@ -236,6 +236,25 @@ export const translations = {
     sosConfirmMessage:   'This will immediately call the Allway Taxi operations line.',
     sosCall:             'Call Now',
 
+    // ── Bottom tab bar ────────────────────────────────────────
+    tabHome:             'Home',
+    tabTrips:            'Trips',
+    tabAccount:          'Account',
+
+    // ── Account screen ────────────────────────────────────────
+    carType:             'Car Type',
+    rideComfort:         'Comfort',
+    photoPermissionTitle:'Permission Required',
+    photoPermissionMsg:  'Please allow photo library access to upload a profile picture.',
+    uploadFailed:        'Upload Failed',
+
+    // ── Trip confirm dialogs ──────────────────────────────────
+    declineTripQ:        'Decline Trip?',
+    declineTripConfirm:  'Are you sure you want to decline this trip?',
+    acceptTripQ:         'Accept Trip?',
+    creditAccount:       'Credit Account',
+    passengers:          'passengers',
+
     // ── Quick actions ────────────────────────────────────────
     quickActions:        'QUICK ACTIONS',
 
@@ -560,6 +579,25 @@ export const translations = {
     sosConfirmTitle:     'الاتصال بالمرسل؟',
     sosConfirmMessage:   'سيتم الاتصال فوراً بخط عمليات Allway Taxi.',
     sosCall:             'اتصل الآن',
+
+    // ── Bottom tab bar ────────────────────────────────────────
+    tabHome:             'الرئيسية',
+    tabTrips:            'الرحلات',
+    tabAccount:          'الحساب',
+
+    // ── Account screen ────────────────────────────────────────
+    carType:             'نوع السيارة',
+    rideComfort:         'كومفورت',
+    photoPermissionTitle:'صلاحية مطلوبة',
+    photoPermissionMsg:  'يرجى السماح بالوصول إلى مكتبة الصور لرفع صورة الملف الشخصي.',
+    uploadFailed:        'فشل الرفع',
+
+    // ── Trip confirm dialogs ──────────────────────────────────
+    declineTripQ:        'رفض الرحلة؟',
+    declineTripConfirm:  'هل أنت متأكد من رفض هذه الرحلة؟',
+    acceptTripQ:         'قبول الرحلة؟',
+    creditAccount:       'حساب آجل',
+    passengers:          'ركاب',
 
     // ── Quick actions ────────────────────────────────────────
     quickActions:        'إجراءات سريعة',
