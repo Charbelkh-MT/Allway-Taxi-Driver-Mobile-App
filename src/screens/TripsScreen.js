@@ -110,7 +110,7 @@ export default function TripsScreen() {
     } finally {
       setLoading(false); setRefreshing(false);
     }
-  }, []);
+  }, [language]); // re-run when language changes so dates reformat correctly
 
   useEffect(() => {
     let channel;
