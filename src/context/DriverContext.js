@@ -310,7 +310,7 @@ export function DriverProvider({ children }) {
             .single();
 
           const tripStatus = tripRow?.[TRIP_COLS.status];
-          const stillActive = tripStatus === 'accepted' || tripStatus === 'picked_up';
+          const stillActive = ['accepted', 'picked_up', 'on_board', 'on_trip', 'dispatching'].includes(tripStatus);
 
           if (stillActive) {
             startTimeRef.current = startTime;
@@ -328,6 +328,37 @@ export function DriverProvider({ children }) {
             return;
           } else {
             await AsyncStorage.removeItem(ACTIVE_TRIP_STORAGE_KEY);
+          }
+        }
+
+        // No saved trip in AsyncStorage — check DB directly in case the app was
+        // killed before saving (e.g. CRM assigned while app was closed).
+        if (!activeTripIdRef.current) {
+          const IN_PROGRESS = ['accepted', 'dispatching', 'picked_up', 'on_board', 'on_trip'];
+          const { data: liveTrip } = await supabase
+            .from(TABLE_TRIPS)
+            .select('*')
+            .eq(TRIP_COLS.driverId, userId)
+            .in(TRIP_COLS.status, IN_PROGRESS)
+            .order(TRIP_COLS.createdAt, { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (liveTrip) {
+            startTimeRef.current = startTime;
+            const restored = normalizeTrip(liveTrip);
+            activeTripIdRef.current = restored.id;
+            setActiveTrip(restored);
+            setDriverState(DRIVER_STATE.ACTIVE);
+            subscribeToTrips(userId);
+            await supabase.from(TABLE_DRIVERS)
+              .update({ [DRIVER_COLS.online]: true, [DRIVER_COLS.status]: 'on_trip' })
+              .eq(DRIVER_COLS.id, userId);
+            try { await startForegroundTracking(userId); } catch {}
+            if (!IS_EXPO_GO) startLocationTracking().catch(() => {});
+            await AsyncStorage.setItem(ACTIVE_TRIP_STORAGE_KEY, JSON.stringify(restored));
+            console.log('[DriverContext] Active trip recovered from DB:', restored.id, '— status:', restored.status);
+            return;
           }
         }
 
