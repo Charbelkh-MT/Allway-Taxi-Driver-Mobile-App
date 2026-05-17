@@ -30,6 +30,7 @@ const STATUS_CONFIG = {
   dispatching: { labelKey: 'statusPending',    accentKey: 'yellow', icon: '📡' },
   accepted:    { labelKey: 'statusAccepted',   accentKey: 'yellow', icon: '🚕' },
   picked_up:   { labelKey: 'statusPickedUp',   accentKey: 'green',  icon: '🟢' },
+  on_board:    { labelKey: 'statusPickedUp',   accentKey: 'green',  icon: '🚗' },
   on_trip:     { labelKey: 'statusPickedUp',   accentKey: 'green',  icon: '🚗' },
   completed:   { labelKey: 'statusCompleted',  accentKey: 'green',  icon: '✓'  },
   no_show:     { labelKey: 'statusNoShow',     accentKey: 'red',    icon: '👻' },
@@ -132,8 +133,13 @@ export default function TripsScreen() {
     return () => { if (channel) supabase.removeChannel(channel); };
   }, [fetchTrips]);
 
+  const IN_PROGRESS_STATUSES = ['accepted', 'dispatching', 'picked_up', 'on_board', 'on_trip'];
   const filtered = useMemo(
-    () => filter === 'all' ? trips : trips.filter(t => t.status === filter),
+    () => filter === 'all'
+      ? trips
+      : filter === 'accepted'
+        ? trips.filter(t => IN_PROGRESS_STATUSES.includes(t.status))
+        : trips.filter(t => t.status === filter),
     [trips, filter]
   );
 

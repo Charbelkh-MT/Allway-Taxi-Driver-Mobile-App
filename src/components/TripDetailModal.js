@@ -12,13 +12,16 @@ import { formatScheduledTime } from '../utils/dateUtils';
 import { FONTS, RADIUS } from '../theme';
 
 const STATUS_CONFIG = {
-  scheduled: { labelKey: 'filterScheduled',  color: 'yellow', icon: '🕐' },
-  pending:   { labelKey: 'statusPending',    color: 'yellow', icon: '⏳' },
-  accepted:  { labelKey: 'statusAccepted',   color: 'yellow', icon: '🚕' },
-  picked_up: { labelKey: 'statusPickedUp',   color: 'green',  icon: '🟢' },
-  completed: { labelKey: 'statusCompleted',  color: 'green',  icon: '✓'  },
-  no_show:   { labelKey: 'statusNoShow',     color: 'red',    icon: '👻' },
-  cancelled: { labelKey: 'statusCancelled',  color: 'red',    icon: '✕'  },
+  scheduled:    { labelKey: 'filterScheduled',  color: 'yellow', icon: '🕐' },
+  pending:      { labelKey: 'statusPending',    color: 'yellow', icon: '⏳' },
+  dispatching:  { labelKey: 'statusPending',    color: 'yellow', icon: '📡' },
+  accepted:     { labelKey: 'statusAccepted',   color: 'yellow', icon: '🚕' },
+  picked_up:    { labelKey: 'statusPickedUp',   color: 'green',  icon: '🟢' },
+  on_board:     { labelKey: 'statusPickedUp',   color: 'green',  icon: '🚗' },
+  on_trip:      { labelKey: 'statusPickedUp',   color: 'green',  icon: '🚗' },
+  completed:    { labelKey: 'statusCompleted',  color: 'green',  icon: '✓'  },
+  no_show:      { labelKey: 'statusNoShow',     color: 'red',    icon: '👻' },
+  cancelled:    { labelKey: 'statusCancelled',  color: 'red',    icon: '✕'  },
 };
 
 const PAYMENT_CONFIG = {
