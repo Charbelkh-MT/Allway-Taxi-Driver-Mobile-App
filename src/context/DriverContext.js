@@ -16,6 +16,7 @@ const IS_EXPO_GO = Constants.appOwnership === 'expo';
 const SHIFT_STORAGE_KEY       = 'allway_active_shift';
 const ACTIVE_TRIP_STORAGE_KEY = 'allway_active_trip';
 const CASH_STORAGE_KEY        = 'allway_shift_cash';
+const DISMISSED_IDS_KEY       = 'allway_dismissed_ids';
 
 export const DRIVER_STATE = {
   OFFLINE:  'offline',
@@ -224,11 +225,15 @@ export function DriverProvider({ children }) {
   const userIdRef         = useRef(null);
   const pickupTimeRef     = useRef(null);
   const cashRef           = useRef(0);
-  // Trips the driver dismissed this session — filtered out of every DB sync
-  // so they don't reappear. Cleared when the shift ends.
+  // Trips the driver dismissed this session — persisted to AsyncStorage so they
+  // survive app kills and don't reappear on restore. Cleared when shift ends.
   const dismissedIdsRef   = useRef(new Set());
+  // Mirrors driverState in a ref so closures (e.g. reconnect timeouts) always
+  // read the current value rather than the value captured at closure creation.
+  const driverStateRef    = useRef(DRIVER_STATE.OFFLINE);
 
   useEffect(() => {
+    driverStateRef.current = driverState;
     if (driverState === DRIVER_STATE.OFFLINE) {
       clearInterval(timerRef.current);
       timerRef.current     = null;
@@ -281,6 +286,12 @@ export function DriverProvider({ children }) {
           const c = parseFloat(savedCash) || 0;
           cashRef.current = c;
           setCashCollected(c);
+        }
+
+        const savedDismissed = await AsyncStorage.getItem(DISMISSED_IDS_KEY);
+        if (savedDismissed) {
+          const ids = JSON.parse(savedDismissed);
+          if (Array.isArray(ids)) ids.forEach(id => dismissedIdsRef.current.add(id));
         }
 
         // goOffline() always removes SHIFT_STORAGE_KEY, so if the key exists the app
@@ -602,7 +613,7 @@ export function DriverProvider({ children }) {
           // Attempt to reconnect after 5s
           setTimeout(() => {
             const uid = userIdRef.current;
-            if (uid && driverState !== DRIVER_STATE.OFFLINE) {
+            if (uid && driverStateRef.current !== DRIVER_STATE.OFFLINE) {
               console.log('[Realtime] Attempting channel reconnect...');
               subscribeToTrips(uid);
             }
@@ -829,6 +840,7 @@ export function DriverProvider({ children }) {
     setCashCollected(0);
     setScheduledTrips([]);
     dismissedIdsRef.current.clear();
+    AsyncStorage.removeItem(DISMISSED_IDS_KEY).catch(() => {});
 
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
@@ -986,8 +998,10 @@ export function DriverProvider({ children }) {
         supabase.from(TABLE_TRIPS).update({ [TRIP_COLS.status]: 'no_show' }).eq(TRIP_COLS.id, tripId),
         uid ? supabase.from(TABLE_DRIVERS).update({ [DRIVER_COLS.status]: 'available' }).eq(DRIVER_COLS.id, uid) : Promise.resolve(),
       ]);
-      if (tripRes.status === 'rejected' || tripRes.value?.error)
+      if (tripRes.status === 'rejected' || tripRes.value?.error) {
         console.warn('[DriverContext] markNoShow trip error:', tripRes.reason ?? tripRes.value?.error?.message);
+        Alert.alert('Sync Error', 'No-show could not be recorded in the system. Please inform the dispatcher.');
+      }
       if (driverRes.status === 'rejected' || driverRes.value?.error) {
         console.warn('[DriverContext] markNoShow driver status error');
         Alert.alert('Status Error', 'Your status could not be updated. You may appear as "on trip" to dispatchers. Please contact support if this persists.');
@@ -1009,8 +1023,10 @@ export function DriverProvider({ children }) {
           .eq(TRIP_COLS.id, tripId),
         uid ? supabase.from(TABLE_DRIVERS).update({ [DRIVER_COLS.status]: 'available' }).eq(DRIVER_COLS.id, uid) : Promise.resolve(),
       ]);
-      if (tripRes.status === 'rejected' || tripRes.value?.error)
+      if (tripRes.status === 'rejected' || tripRes.value?.error) {
         console.warn('[DriverContext] cancelTrip trip error:', tripRes.reason ?? tripRes.value?.error?.message);
+        Alert.alert('Sync Error', 'Cancellation could not be recorded in the system. Please inform the dispatcher.');
+      }
       if (driverRes.status === 'rejected' || driverRes.value?.error) {
         console.warn('[DriverContext] cancelTrip driver status error');
         Alert.alert('Status Error', 'Your status could not be updated. Contact support if you stop receiving trips.');
@@ -1100,6 +1116,7 @@ export function DriverProvider({ children }) {
   function dismissTrip(tripId) {
     dismissedIdsRef.current.add(tripId);
     setAvailableTrips(prev => prev.filter(t => t.id !== tripId));
+    AsyncStorage.setItem(DISMISSED_IDS_KEY, JSON.stringify([...dismissedIdsRef.current])).catch(() => {});
   }
 
   return (
