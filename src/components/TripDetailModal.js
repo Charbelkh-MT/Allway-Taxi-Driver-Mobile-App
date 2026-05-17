@@ -68,10 +68,10 @@ export default function TripDetailModal({ trip, visible, onClose }) {
       : null;
 
   // Context-aware actions based on status
-  const isAccepted   = trip.status === 'accepted';
-  const isPickedUp   = trip.status === 'picked_up';
-  const showCall     = (isAccepted || isPickedUp) && !!trip.phone;
-  const showToPickup = isAccepted;
+  const isAccepted    = ['accepted', 'dispatching'].includes(trip.status);
+  const isPickedUp    = ['picked_up', 'on_board', 'on_trip'].includes(trip.status);
+  const showCall      = (isAccepted || isPickedUp) && !!trip.phone;
+  const showToPickup  = isAccepted;
   const showToDropoff = isAccepted || isPickedUp;
 
   async function callCustomer() {

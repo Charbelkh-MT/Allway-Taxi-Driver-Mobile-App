@@ -205,7 +205,7 @@ export const TRIP_COLS = {
   scheduledFor:       'scheduled_for',
   groupSize:          'group_size',
   notes:              'notes',
-  // Trip status values: 'pending' | 'scheduled' | 'dispatching' | 'accepted' | 'picked_up' | 'completed' | 'no_show' | 'cancelled'
+  // Trip status values: 'pending' | 'no_driver' | 'scheduled' | 'dispatching' | 'accepted' | 'picked_up' | 'on_board' | 'on_trip' | 'completed' | 'no_show' | 'cancelled'
   // ride_type values: 'comfort' | 'xl'
 };
 

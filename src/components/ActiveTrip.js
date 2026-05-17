@@ -181,8 +181,8 @@ export default function ActiveTrip({ trip, onComplete, onPickUp, onNoShow, onCan
     return () => clearInterval(timerRef.current);
   }, []);
 
-  const isAccepted = trip.status === 'accepted' || !trip.status;
-  const isPickedUp = trip.status === 'picked_up';
+  const isAccepted = ['accepted', 'dispatching'].includes(trip.status) || !trip.status;
+  const isPickedUp = ['picked_up', 'on_board', 'on_trip'].includes(trip.status);
 
   async function callCustomer() {
     const url = `tel:${trip.phone}`;
