@@ -32,7 +32,7 @@ export default function HomeScreen() {
     driverState, activeTrip, showTripSheet,
     availableTrips, shiftTime, shiftSeconds, isOnline,
     cashCollected, scheduledTrips, buildShiftSummary,
-    goOnline, goOffline, acceptTrip, completeTrip,
+    goOnline, goOffline, acceptTrip, completeTrip, markTripCompleteInDB,
     pickUpPassenger, markNoShow, cancelTrip, openTripSheet, dismissTrip,
     syncPendingTrips, fetchScheduledTrips,
   } = useDriver();
@@ -242,6 +242,7 @@ export default function HomeScreen() {
             <ActiveTrip
               trip={activeTrip}
               onComplete={completeTrip}
+              onMarkComplete={markTripCompleteInDB}
               onPickUp={pickUpPassenger}
               onNoShow={markNoShow}
               onCancel={cancelTrip}

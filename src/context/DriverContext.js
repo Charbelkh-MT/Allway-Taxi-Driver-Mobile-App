@@ -1099,6 +1099,35 @@ export function DriverProvider({ children }) {
     }
   }
 
+  // Updates trip status to 'completed' in the DB immediately when payment is confirmed,
+  // without clearing local state — so the tracking page updates before the rating modal appears.
+  async function markTripCompleteInDB(paymentMethod = 'cash') {
+    const tripId   = activeTripIdRef.current;
+    const tripSnap = activeTrip;
+    if (!tripId || isDemoRef.current) return;
+
+    const normalizedMethod = paymentMethod.startsWith('split|') ? 'split' : paymentMethod;
+    const durationMin = pickupTimeRef.current
+      ? Math.round((Date.now() - pickupTimeRef.current) / 60000)
+      : null;
+    let distanceKm = null;
+    if (tripSnap?.pickupLat && tripSnap?.pickupLng && tripSnap?.dropoffLat && tripSnap?.dropoffLng) {
+      distanceKm = haversineKm(tripSnap.pickupLat, tripSnap.pickupLng, tripSnap.dropoffLat, tripSnap.dropoffLng);
+      distanceKm = Math.round(distanceKm * 10) / 10;
+    }
+    try {
+      await supabase.from(TABLE_TRIPS).update({
+        [TRIP_COLS.status]:        'completed',
+        [TRIP_COLS.paymentMethod]: normalizedMethod,
+        [TRIP_COLS.durationMin]:   durationMin,
+        [TRIP_COLS.distanceKm]:    distanceKm,
+        [TRIP_COLS.completedAt]:   new Date().toISOString(),
+      }).eq(TRIP_COLS.id, tripId);
+    } catch (e) {
+      console.warn('[DriverContext] markTripCompleteInDB failed:', e.message);
+    }
+  }
+
   // withSound = true only for realtime-triggered popups; false when the driver taps the button manually
   function openTripSheet(trip, withSound = false) {
     setTripSoundEnabled(withSound);
@@ -1141,6 +1170,7 @@ export function DriverProvider({ children }) {
         markNoShow,
         cancelTrip,
         completeTrip,
+        markTripCompleteInDB,
         openTripSheet,
         closeTripSheet,
         dismissTrip,

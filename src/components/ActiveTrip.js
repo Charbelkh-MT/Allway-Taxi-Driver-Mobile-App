@@ -161,7 +161,7 @@ const ratingStyles = StyleSheet.create({
   btnText: { fontSize: 16, fontFamily: FONTS.black },
 });
 
-export default function ActiveTrip({ trip, onComplete, onPickUp, onNoShow, onCancel }) {
+export default function ActiveTrip({ trip, onComplete, onMarkComplete, onPickUp, onNoShow, onCancel }) {
   const { colors } = useTheme();
   const { t, isRTL } = useLanguage();
   const [showPayment, setShowPayment] = useState(false);
@@ -243,6 +243,7 @@ export default function ActiveTrip({ trip, onComplete, onPickUp, onNoShow, onCan
     setShowPayment(false);
     setPaidMethod(method);
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    onMarkComplete?.(method);
     setShowSuccess(true);
   }
 
