@@ -9,7 +9,7 @@ const { width: SCREEN_W }   = Dimensions.get('window');
 const LARGE_GROUP_THRESHOLD = 6;
 const ORANGE                = '#F5A623';
 
-function UpcomingCard({ trip, colors, isDark, t, onPress }) {
+function UpcomingCard({ trip, colors, isDark, t, language, onPress }) {
   const isLargeGroup = (trip.groupSize ?? 0) > LARGE_GROUP_THRESHOLD;
   const accent       = colors.yellow;
   const customerName = trip.customerFull && trip.customerFull !== 'Customer'
@@ -115,6 +115,7 @@ export default function UpcomingTrips({ trips, onPressTrip }) {
               colors={colors}
               isDark={isDark}
               t={t}
+              language={language}
               onPress={() => onPressTrip?.(item)}
             />
           </View>
