@@ -9,17 +9,26 @@ import { useTheme } from '../context/ThemeContext';
 import { useDriver } from '../context/DriverContext';
 import { useLanguage } from '../context/LanguageContext';
 import { FONTS, RADIUS } from '../theme';
-import { relativeTime, formatScheduledTime, formatTripDateTime } from '../utils/dateUtils';
+import { formatScheduledTime, formatTripDateTime } from '../utils/dateUtils';
 import AppHeader from '../components/AppHeader';
 import { SkeletonTripCard } from '../components/Skeleton';
 import { supabase } from '../utils/supabase';
 import { TABLE_TRIPS, TRIP_COLS } from '../config';
 
-const FILTERS = [
+// ─── Constants ───────────────────────────────────────────────────────────────
+
+const DATE_RANGES = [
+  { id: 'today', labelKey: 'today'     },
+  { id: 'week',  labelKey: 'thisWeek'  },
+  { id: 'month', labelKey: 'thisMonth' },
+  { id: 'all',   labelKey: 'filterAll' },
+];
+
+const STATUS_FILTERS = [
   { id: 'all',       labelKey: 'filterAll'         },
-  { id: 'scheduled', labelKey: 'filterScheduled'   },
   { id: 'completed', labelKey: 'filterCompleted'   },
   { id: 'accepted',  labelKey: 'filterDispatching' },
+  { id: 'scheduled', labelKey: 'filterScheduled'   },
   { id: 'no_show',   labelKey: 'statusNoShow'      },
   { id: 'cancelled', labelKey: 'filterCancelled'   },
 ];
@@ -37,8 +46,34 @@ const STATUS_CONFIG = {
   cancelled:   { labelKey: 'statusCancelled',  accentKey: 'red',    icon: '✕'  },
 };
 
-const Separator   = () => <View style={{ height: 10 }} />;
-const EmptyState  = React.memo(({ colors }) => {
+const PAYMENT_ICONS  = { cash: '💵', card: '💳', debt: '📋', wish: '💙', wallet: '💰', split: '🔀' };
+const PAYMENT_COLORS = ['#F5A623', '#4CAF50', '#2196F3', '#9C27B0', '#FF5722', '#607D8B'];
+
+const IN_PROGRESS_STATUSES = ['accepted', 'dispatching', 'picked_up', 'on_board', 'on_trip'];
+
+// Returns ISO string for the start of the selected date range, or null for 'all'
+function rangeStart(range) {
+  const now = new Date();
+  if (range === 'today') {
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+  }
+  if (range === 'week') {
+    const d = new Date(now);
+    d.setDate(d.getDate() - 6);
+    d.setHours(0, 0, 0, 0);
+    return d.toISOString();
+  }
+  if (range === 'month') {
+    return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  }
+  return null;
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+const Separator  = () => <View style={{ height: 10 }} />;
+
+const EmptyState = React.memo(({ colors }) => {
   const { t } = useLanguage();
   return (
     <View style={emptyStyles.wrap}>
@@ -48,6 +83,7 @@ const EmptyState  = React.memo(({ colors }) => {
     </View>
   );
 });
+
 const emptyStyles = StyleSheet.create({
   wrap:  { alignItems: 'center', paddingTop: 60, gap: 10 },
   icon:  { fontSize: 48 },
@@ -55,22 +91,27 @@ const emptyStyles = StyleSheet.create({
   text:  { fontSize: 13, fontFamily: FONTS.semiBold, textAlign: 'center' },
 });
 
+// ─── Main Screen ──────────────────────────────────────────────────────────────
+
 export default function TripsScreen() {
-  const { colors }  = useTheme();
-  const { isOnline } = useDriver();
+  const { colors, isDark } = useTheme();
+  const { isOnline }       = useDriver();
   const { t, isRTL, language } = useLanguage();
-  const [filter, setFilter]           = useState('all');
-  const [trips, setTrips]             = useState([]);
-  const [stats, setStats]             = useState({ total: 0, earned: 0, completed: 0 });
-  const [loading, setLoading]         = useState(true);
-  const [refreshing, setRefreshing]   = useState(false);
+
+  const [dateRange,    setDateRange]    = useState('week');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [trips,        setTrips]        = useState([]);
+  const [loading,      setLoading]      = useState(true);
+  const [refreshing,   setRefreshing]   = useState(false);
   const [selectedTrip, setSelectedTrip] = useState(null);
 
+  // ── Data fetching ────────────────────────────────────────────────────────
   const fetchTrips = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const { data, error: e } = await supabase
+
+      let query = supabase
         .from(TABLE_TRIPS)
         .select([
           'id',
@@ -82,20 +123,26 @@ export default function TripsScreen() {
         ].join(', '))
         .eq(TRIP_COLS.driverId, user.id)
         .not(TRIP_COLS.status, 'in', '(pending,no_driver)')
-        .order(TRIP_COLS.createdAt, { ascending: false })
-        .limit(200);
+        .order(TRIP_COLS.createdAt, { ascending: false });
+
+      const since = rangeStart(dateRange);
+      if (since) query = query.gte(TRIP_COLS.createdAt, since);
+      else        query = query.limit(200);
+
+      const { data, error: e } = await query;
       if (e) throw e;
-      let totalEarned = 0, completedCount = 0;
+
       const mapped = (data ?? []).map(row => {
-        const fare = row[TRIP_COLS.fare];
-        if (row[TRIP_COLS.status] === 'completed') { totalEarned += Number(fare) || 0; completedCount++; }
+        const fareRaw = row[TRIP_COLS.fare];
+        const fareNum = Number(fareRaw) || 0;
         return {
           id:            row.id,
           name:          row[TRIP_COLS.customerName] || 'Passenger',
           phone:         row[TRIP_COLS.customerPhone] ?? '',
           pickup:        row[TRIP_COLS.pickupAddress]  ?? '',
           dropoff:       row[TRIP_COLS.dropoffAddress] ?? '',
-          fare:          fare != null ? `$${Number(fare).toFixed(0)}` : '',
+          fare:          fareNum > 0 ? `$${fareNum.toFixed(0)}` : '',
+          fareNum,
           dist:          row[TRIP_COLS.distanceKm] != null ? `${Number(row[TRIP_COLS.distanceKm]).toFixed(1)} km` : '',
           status:        row[TRIP_COLS.status] ?? 'completed',
           paymentMethod: row[TRIP_COLS.paymentMethod] ?? '',
@@ -105,14 +152,15 @@ export default function TripsScreen() {
         };
       });
       setTrips(mapped);
-      setStats({ total: mapped.length, earned: totalEarned, completed: completedCount });
     } catch (e) {
       console.warn('[TripsScreen] fetchTrips error:', e.message);
     } finally {
-      setLoading(false); setRefreshing(false);
+      setLoading(false);
+      setRefreshing(false);
     }
-  }, [language]); // re-run when language changes so dates reformat correctly
+  }, [language, dateRange]);
 
+  // Realtime subscription + initial fetch
   useEffect(() => {
     let channel;
     async function init() {
@@ -122,9 +170,7 @@ export default function TripsScreen() {
       channel = supabase
         .channel(`trips-list-${user.id}`)
         .on('postgres_changes', {
-          event:  '*',
-          schema: 'public',
-          table:  TABLE_TRIPS,
+          event: '*', schema: 'public', table: TABLE_TRIPS,
           filter: `${TRIP_COLS.driverId}=eq.${user.id}`,
         }, fetchTrips)
         .subscribe();
@@ -133,33 +179,65 @@ export default function TripsScreen() {
     return () => { if (channel) supabase.removeChannel(channel); };
   }, [fetchTrips]);
 
-  const IN_PROGRESS_STATUSES = ['accepted', 'dispatching', 'picked_up', 'on_board', 'on_trip'];
-  const filtered = useMemo(
-    () => filter === 'all'
-      ? trips
-      : filter === 'accepted'
-        ? trips.filter(t => IN_PROGRESS_STATUSES.includes(t.status))
-        : trips.filter(t => t.status === filter),
-    [trips, filter]
-  );
+  // ── Filtered list ────────────────────────────────────────────────────────
+  const filtered = useMemo(() => {
+    if (statusFilter === 'all')      return trips;
+    if (statusFilter === 'accepted') return trips.filter(t => IN_PROGRESS_STATUSES.includes(t.status));
+    return trips.filter(t => t.status === statusFilter);
+  }, [trips, statusFilter]);
+
+  // ── Stats (computed from filtered list) ──────────────────────────────────
+  const stats = useMemo(() => {
+    const completed = filtered.filter(t => t.status === 'completed');
+    const earned    = completed.reduce((sum, t) => sum + t.fareNum, 0);
+    const failed    = filtered.filter(t => t.status === 'no_show' || t.status === 'cancelled').length;
+    const avgFare   = completed.length ? earned / completed.length : 0;
+
+    // Payment method breakdown (completed trips only)
+    const payMap = {};
+    completed.forEach(trip => {
+      const method = trip.paymentMethod.startsWith('split|') ? 'split' : (trip.paymentMethod || 'cash');
+      payMap[method] = (payMap[method] || 0) + 1;
+    });
+    const total = completed.length || 1;
+    const breakdown = Object.entries(payMap)
+      .map(([method, count], i) => ({
+        method,
+        count,
+        pct:   Math.round((count / total) * 100),
+        color: PAYMENT_COLORS[i % PAYMENT_COLORS.length],
+        icon:  PAYMENT_ICONS[method] ?? '💳',
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    return { earned, completedCount: completed.length, failed, avgFare, breakdown };
+  }, [filtered]);
 
   const renderItem = useCallback(({ item, index }) => (
     <TripRow trip={item} index={index} onPress={() => setSelectedTrip(item)} />
   ), []);
 
+  // ── Render ───────────────────────────────────────────────────────────────
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <SafeAreaView edges={['top']} style={{ backgroundColor: colors.appBar }}>
         <AppHeader online={isOnline} />
       </SafeAreaView>
 
+      {/* Page title */}
       <View style={styles.pageHeader}>
         <Text style={[styles.pageTitle, { color: colors.textPrimary }]}>{t('tripHistory')}</Text>
+      </View>
+
+      {/* Stats panel */}
+      <View style={[styles.statsCard, { backgroundColor: colors.bgCard, borderColor: colors.border }, !isDark && styles.statsCardShadow]}>
+        {/* 4 numbers */}
         <View style={[styles.statsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           {[
-            { val: loading ? '—' : `$${stats.earned.toFixed(0)}`, label: t('totalEarned'),    color: colors.yellow },
-            { val: loading ? '—' : String(stats.completed),       label: t('completedCount'), color: colors.green  },
-            { val: loading ? '—' : String(stats.total),           label: t('totalCount'),     color: colors.textPrimary },
+            { val: loading ? '—' : `$${stats.earned.toFixed(0)}`,         label: t('totalEarned'),    color: colors.yellow },
+            { val: loading ? '—' : String(stats.completedCount),           label: t('completedCount'), color: colors.green  },
+            { val: loading ? '—' : String(stats.failed),                   label: t('tripsFailedCount'), color: colors.red },
+            { val: loading ? '—' : (stats.avgFare ? `$${stats.avgFare.toFixed(0)}` : '—'), label: t('avgFare'), color: colors.textPrimary },
           ].map((s, i) => (
             <React.Fragment key={s.label}>
               {i > 0 && <View style={[styles.statDivider, { backgroundColor: colors.border }]} />}
@@ -170,20 +248,44 @@ export default function TripsScreen() {
             </React.Fragment>
           ))}
         </View>
+
+        {/* Payment breakdown */}
+        {!loading && stats.breakdown.length > 0 && (
+          <View style={[styles.breakdownWrap, { borderTopColor: colors.border }]}>
+            {/* Proportional bar */}
+            <View style={styles.breakdownBar}>
+              {stats.breakdown.map(b => (
+                <View
+                  key={b.method}
+                  style={[styles.breakdownSegment, { flex: b.pct, backgroundColor: b.color }]}
+                />
+              ))}
+            </View>
+            {/* Labels */}
+            <View style={styles.breakdownLabels}>
+              {stats.breakdown.map(b => (
+                <Text key={b.method} style={[styles.breakdownLabel, { color: colors.textMuted }]}>
+                  {b.icon} {t(b.method) || b.method} {b.pct}%
+                </Text>
+              ))}
+            </View>
+          </View>
+        )}
       </View>
 
+      {/* Date range filter */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.filterRow}
         style={styles.filterWrap}
       >
-        {FILTERS.map(({ id, labelKey }) => {
-          const active = filter === id;
+        {DATE_RANGES.map(({ id, labelKey }) => {
+          const active = dateRange === id;
           return (
             <TouchableOpacity
               key={id}
-              onPress={() => setFilter(id)}
+              onPress={() => { setLoading(true); setDateRange(id); }}
               style={[styles.filterPill, {
                 backgroundColor: active ? colors.yellow : colors.bgCard,
                 borderColor:     active ? colors.yellow : colors.border,
@@ -192,6 +294,36 @@ export default function TripsScreen() {
             >
               <Text style={[styles.filterText, {
                 color:      active ? '#000' : colors.textMuted,
+                fontFamily: active ? FONTS.extraBold : FONTS.semiBold,
+              }]}>
+                {t(labelKey)}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
+      {/* Status filter */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filterRow}
+        style={styles.filterWrap}
+      >
+        {STATUS_FILTERS.map(({ id, labelKey }) => {
+          const active = statusFilter === id;
+          return (
+            <TouchableOpacity
+              key={id}
+              onPress={() => setStatusFilter(id)}
+              style={[styles.filterPill, {
+                backgroundColor: active ? colors.textSecondary : colors.bgCard,
+                borderColor:     active ? colors.textSecondary : colors.border,
+              }]}
+              activeOpacity={0.75}
+            >
+              <Text style={[styles.filterText, {
+                color:      active ? colors.bg : colors.textMuted,
                 fontFamily: active ? FONTS.extraBold : FONTS.semiBold,
               }]}>
                 {t(labelKey)}
@@ -214,7 +346,7 @@ export default function TripsScreen() {
       ) : (
         <FlatList
           data={filtered}
-          keyExtractor={t => t.id}
+          keyExtractor={item => item.id}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -234,11 +366,11 @@ export default function TripsScreen() {
   );
 }
 
-const PAYMENT_ICONS = { cash: '💵', card: '💳', debt: '📋' };
+// ─── Trip Row ─────────────────────────────────────────────────────────────────
 
 const TripRow = memo(function TripRow({ trip, index = 0, onPress }) {
   const { colors, isDark } = useTheme();
-  const { t, language } = useLanguage();
+  const { t, language }    = useLanguage();
   const cfgRaw   = STATUS_CONFIG[trip.status] || STATUS_CONFIG.completed;
   const cfg      = { ...cfgRaw, label: t(cfgRaw.labelKey) };
   const color    = colors[cfg.accentKey];
@@ -310,40 +442,59 @@ const TripRow = memo(function TripRow({ trip, index = 0, onPress }) {
   );
 });
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   container:   { flex: 1 },
-  pageHeader:  { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 16 },
-  pageTitle:   { fontSize: 28, fontFamily: FONTS.black, marginBottom: 16 },
-  statsRow:    { flexDirection: 'row', alignItems: 'center' },
-  stat:        { flex: 1, alignItems: 'center' },
-  statVal:     { fontSize: 22, fontFamily: FONTS.black, marginBottom: 2 },
-  statLabel:   { fontSize: 11, fontFamily: FONTS.semiBold },
-  statDivider: { width: 1, height: 32 },
-  filterWrap:  { maxHeight: 56 },
-  filterRow:   { paddingHorizontal: 16, paddingVertical: 10, gap: 8, alignItems: 'center' },
-  filterPill:  { paddingVertical: 8, paddingHorizontal: 18, borderRadius: RADIUS.full, borderWidth: 1 },
+  pageHeader:  { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 10 },
+  pageTitle:   { fontSize: 28, fontFamily: FONTS.black },
+
+  // Stats card
+  statsCard:       { marginHorizontal: 16, marginBottom: 6, borderWidth: 1, borderRadius: RADIUS.xxl, paddingTop: 18, paddingHorizontal: 16, paddingBottom: 14 },
+  statsCardShadow: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2 },
+  statsRow:        { flexDirection: 'row', alignItems: 'center' },
+  stat:            { flex: 1, alignItems: 'center', paddingBottom: 4 },
+  statVal:         { fontSize: 20, fontFamily: FONTS.black, marginBottom: 2 },
+  statLabel:       { fontSize: 10, fontFamily: FONTS.semiBold, textAlign: 'center' },
+  statDivider:     { width: 1, height: 32 },
+
+  // Payment breakdown
+  breakdownWrap:    { borderTopWidth: StyleSheet.hairlineWidth, marginTop: 14, paddingTop: 12, gap: 8 },
+  breakdownBar:     { flexDirection: 'row', height: 6, borderRadius: 3, overflow: 'hidden', gap: 2 },
+  breakdownSegment: { borderRadius: 3 },
+  breakdownLabels:  { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  breakdownLabel:   { fontSize: 11, fontFamily: FONTS.semiBold },
+
+  // Filters
+  filterWrap:  { maxHeight: 50 },
+  filterRow:   { paddingHorizontal: 16, paddingVertical: 8, gap: 8, alignItems: 'center' },
+  filterPill:  { paddingVertical: 7, paddingHorizontal: 16, borderRadius: RADIUS.full, borderWidth: 1 },
   filterText:  { fontSize: 12 },
+
+  // List
   listContent: { padding: 16, paddingBottom: Platform.OS === 'ios' ? 140 : 32 },
-  cardWrap:         { },
-  cardShadow:       { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2 },
-  card:             { flexDirection: 'row', borderWidth: 1, borderRadius: RADIUS.xl, overflow: 'hidden' },
-  cardAccent:       { width: 5 },
-  cardBody:         { flex: 1, paddingVertical: 14, paddingHorizontal: 14 },
-  cardTop:          { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 },
-  cardTopLeft:      { flex: 1 },
-  cardTopRight:     { alignItems: 'flex-end', gap: 6 },
-  cardName:         { fontSize: 16, fontFamily: FONTS.black, marginBottom: 2 },
-  cardTime:         { fontSize: 11, fontFamily: FONTS.semiBold },
-  cardFare:         { fontSize: 20, fontFamily: FONTS.black },
-  chip:             { borderWidth: 1, borderRadius: RADIUS.sm, paddingVertical: 4, paddingHorizontal: 10 },
-  chipText:         { fontSize: 10, fontFamily: FONTS.extraBold },
-  routeBlock:       { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 12, gap: 4 },
-  routeRow:         { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  dotG:             { width: 9, height: 9, borderRadius: 5, marginTop: 5, flexShrink: 0 },
-  dotR:             { width: 9, height: 9, borderRadius: 5, marginTop: 5, flexShrink: 0 },
-  routeConnector:   { width: 1.5, height: 10, marginLeft: 4, borderRadius: 1 },
-  routeAddr:        { fontSize: 13, fontFamily: FONTS.semiBold, flex: 1, lineHeight: 19 },
-  cardFooter:       { flexDirection: 'row', alignItems: 'center', gap: 14, borderTopWidth: StyleSheet.hairlineWidth, marginTop: 12, paddingTop: 10 },
-  footerItem:       { fontSize: 12, fontFamily: FONTS.semiBold },
-  footerChevron:    { marginLeft: 'auto', fontSize: 20, lineHeight: 22 },
+
+  // Trip card
+  cardWrap:       { },
+  cardShadow:     { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2 },
+  card:           { flexDirection: 'row', borderWidth: 1, borderRadius: RADIUS.xl, overflow: 'hidden' },
+  cardAccent:     { width: 5 },
+  cardBody:       { flex: 1, paddingVertical: 14, paddingHorizontal: 14 },
+  cardTop:        { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 },
+  cardTopLeft:    { flex: 1 },
+  cardTopRight:   { alignItems: 'flex-end', gap: 6 },
+  cardName:       { fontSize: 16, fontFamily: FONTS.black, marginBottom: 2 },
+  cardTime:       { fontSize: 11, fontFamily: FONTS.semiBold },
+  cardFare:       { fontSize: 20, fontFamily: FONTS.black },
+  chip:           { borderWidth: 1, borderRadius: RADIUS.sm, paddingVertical: 4, paddingHorizontal: 10 },
+  chipText:       { fontSize: 10, fontFamily: FONTS.extraBold },
+  routeBlock:     { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 12, gap: 4 },
+  routeRow:       { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  dotG:           { width: 9, height: 9, borderRadius: 5, marginTop: 5, flexShrink: 0 },
+  dotR:           { width: 9, height: 9, borderRadius: 5, marginTop: 5, flexShrink: 0 },
+  routeConnector: { width: 1.5, height: 10, marginLeft: 4, borderRadius: 1 },
+  routeAddr:      { fontSize: 13, fontFamily: FONTS.semiBold, flex: 1, lineHeight: 19 },
+  cardFooter:     { flexDirection: 'row', alignItems: 'center', gap: 14, borderTopWidth: StyleSheet.hairlineWidth, marginTop: 12, paddingTop: 10 },
+  footerItem:     { fontSize: 12, fontFamily: FONTS.semiBold },
+  footerChevron:  { marginLeft: 'auto', fontSize: 20, lineHeight: 22 },
 });
