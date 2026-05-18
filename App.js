@@ -23,6 +23,7 @@ import { DriverProvider, useDriver } from './src/context/DriverContext';
 import { LanguageProvider } from './src/context/LanguageContext';
 import RootNavigator from './src/navigation';
 import TripRequestSheet from './src/components/TripRequestSheet';
+import ErrorBoundary from './src/components/ErrorBoundary';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -74,19 +75,21 @@ function AppInner() {
 
 export default function App() {
   return (
-    <GestureHandlerRootView style={styles.fill}>
-      <SafeAreaProvider>
-        <LanguageProvider>
-          <ThemeProvider>
-            <AuthProvider>
-              <DriverProvider>
-                <AppInner />
-              </DriverProvider>
-            </AuthProvider>
-          </ThemeProvider>
-        </LanguageProvider>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <ErrorBoundary>
+      <GestureHandlerRootView style={styles.fill}>
+        <SafeAreaProvider>
+          <LanguageProvider>
+            <ThemeProvider>
+              <AuthProvider>
+                <DriverProvider>
+                  <AppInner />
+                </DriverProvider>
+              </AuthProvider>
+            </ThemeProvider>
+          </LanguageProvider>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </ErrorBoundary>
   );
 }
 

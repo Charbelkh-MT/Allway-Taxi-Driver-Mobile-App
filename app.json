@@ -21,6 +21,7 @@
         "NSLocationWhenInUseUsageDescription": "Allway Driver needs your location to match you with nearby trips.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Allway Driver tracks your location in the background so dispatchers can see your position when you are online.",
         "NSLocationAlwaysUsageDescription": "Allway Driver tracks your location in the background while you are on shift.",
+        "NSFaceIDUsageDescription": "Allway Driver uses Face ID so you can sign in quickly without entering your PIN.",
         "NSCameraUsageDescription": "Used to upload your profile photo.",
         "NSMicrophoneUsageDescription": "Used to record voice messages when reporting an incident to the operations team.",
         "NSPhotoLibraryUsageDescription": "Used to select a profile photo from your photo library.",
@@ -49,7 +50,9 @@
         "android.permission.USE_FULL_SCREEN_INTENT",
         "android.permission.WAKE_LOCK",
         "android.permission.RECORD_AUDIO",
-        "android.permission.MODIFY_AUDIO_SETTINGS"
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
       ]
     },
     "plugins": [

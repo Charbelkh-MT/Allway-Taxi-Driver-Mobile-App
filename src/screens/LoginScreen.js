@@ -1,8 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
   ScrollView, ActivityIndicator, Animated, KeyboardAvoidingView,
-  Platform, Image,
+  Platform, Image, Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -10,6 +10,10 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 import { FONTS, RADIUS } from '../theme';
+import {
+  isBiometricAvailable, isBiometricEnabled, enableBiometric,
+  authenticateWithBiometric, getBiometricCredentials, getBiometricType,
+} from '../utils/biometric';
 
 function mapLoginError(message, t) {
   const msg = (message ?? '').toLowerCase();
@@ -26,11 +30,13 @@ export default function LoginScreen() {
   const { login }            = useAuth();
   const { colors }           = useTheme();
   const { t, isRTL }         = useLanguage();
-  const [phone, setPhone]    = useState('');
-  const [pin, setPin]        = useState('');
-  const [error, setError]    = useState('');
-  const [loading, setLoading]  = useState(false);
-  const [success, setSuccess]  = useState(false);
+  const [phone, setPhone]        = useState('');
+  const [pin, setPin]            = useState('');
+  const [error, setError]        = useState('');
+  const [loading, setLoading]    = useState(false);
+  const [success, setSuccess]    = useState(false);
+  const [showBiometric,  setShowBiometric]  = useState(false);
+  const [biometricType,  setBiometricType]  = useState('fingerprint'); // 'face' | 'fingerprint'
 
   const shakeAnim      = useRef(new Animated.Value(0)).current;
   const logoScale      = useRef(new Animated.Value(0.6)).current;
@@ -41,7 +47,17 @@ export default function LoginScreen() {
   const overlayScale   = useRef(new Animated.Value(0.92)).current;
   const pinRef         = useRef(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
+    async function checkBiometric() {
+      const available = await isBiometricAvailable();
+      const enabled   = await isBiometricEnabled();
+      if (available) setBiometricType(await getBiometricType());
+      setShowBiometric(available && enabled);
+    }
+    checkBiometric();
+  }, []);
+
+  useEffect(() => {
     Animated.sequence([
       Animated.parallel([
         Animated.spring(logoScale,   { toValue: 1, useNativeDriver: true, tension: 80, friction: 7 }),
@@ -65,6 +81,19 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await login(phone, pin);
+      // Offer biometric setup after first successful manual login
+      const available = await isBiometricAvailable();
+      const enabled   = await isBiometricEnabled();
+      if (available && !enabled) {
+        Alert.alert(
+          t('enableBiometricQ'),
+          t('enableBiometricMsg'),
+          [
+            { text: t('cancel'), style: 'cancel' },
+            { text: t('enableBiometricYes'), onPress: () => enableBiometric(phone, pin) },
+          ]
+        );
+      }
       setSuccess(true);
       Animated.parallel([
         Animated.timing(overlayOpacity, { toValue: 1, duration: 320, useNativeDriver: true }),
@@ -74,6 +103,37 @@ export default function LoginScreen() {
       setError(mapLoginError(e.message, t));
       triggerShake();
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setLoading(false);
+    }
+  }
+
+  async function handleBiometricLogin() {
+    setError('');
+    setLoading(true);
+    try {
+      const passed = await authenticateWithBiometric(t('biometricPrompt'));
+      if (!passed) {
+        setError(t('biometricFailed'));
+        triggerShake();
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        return;
+      }
+      const creds = await getBiometricCredentials();
+      if (!creds) {
+        setError(t('biometricFailed'));
+        return;
+      }
+      await login(creds.phone, creds.pin);
+      setSuccess(true);
+      Animated.parallel([
+        Animated.timing(overlayOpacity, { toValue: 1, duration: 320, useNativeDriver: true }),
+        Animated.spring(overlayScale,   { toValue: 1, tension: 80, friction: 8, useNativeDriver: true }),
+      ]).start();
+    } catch (e) {
+      setError(mapLoginError(e.message, t));
+      triggerShake();
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } finally {
       setLoading(false);
     }
   }
@@ -173,6 +233,22 @@ export default function LoginScreen() {
                 }
               </LinearGradient>
             </TouchableOpacity>
+
+            {showBiometric && (
+              <TouchableOpacity
+                onPress={handleBiometricLogin}
+                disabled={loading}
+                activeOpacity={0.75}
+                style={[styles.biometricBtn, { borderColor: colors.border, backgroundColor: colors.bgCard }]}
+              >
+                <Text style={styles.biometricIcon}>
+                  {biometricType === 'face' ? '🪪' : '👆'}
+                </Text>
+                <Text style={[styles.biometricText, { color: colors.textSecondary }]}>
+                  {biometricType === 'face' ? t('faceIdLogin') : t('biometricLogin')}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         </Animated.View>
 
@@ -227,9 +303,12 @@ const styles = StyleSheet.create({
   errorBox:  { marginTop: 14, padding: 12, borderWidth: 1, borderRadius: RADIUS.md },
   errorText: { fontSize: 12, fontFamily: FONTS.bold },
 
-  btnWrap: { marginTop: 20, borderRadius: RADIUS.lg, overflow: 'hidden' },
-  btn:     { paddingVertical: 17, alignItems: 'center', justifyContent: 'center' },
-  btnText: { fontSize: 15, fontFamily: FONTS.black, color: '#000', letterSpacing: 0.3 },
+  btnWrap:       { marginTop: 20, borderRadius: RADIUS.lg, overflow: 'hidden' },
+  btn:           { paddingVertical: 17, alignItems: 'center', justifyContent: 'center' },
+  btnText:       { fontSize: 15, fontFamily: FONTS.black, color: '#000', letterSpacing: 0.3 },
+  biometricBtn:  { marginTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: RADIUS.lg, borderWidth: 1 },
+  biometricIcon: { fontSize: 20 },
+  biometricText: { fontSize: 14, fontFamily: FONTS.bold },
 
   overlay:      { alignItems: 'center', justifyContent: 'center' },
   overlayInner: { alignItems: 'center', paddingHorizontal: 40 },
