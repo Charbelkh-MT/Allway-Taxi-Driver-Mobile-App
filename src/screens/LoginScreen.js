@@ -85,9 +85,10 @@ export default function LoginScreen() {
       const available = await isBiometricAvailable();
       const enabled   = await isBiometricEnabled();
       if (available && !enabled) {
+        const isFace = biometricType === 'face';
         Alert.alert(
-          t('enableBiometricQ'),
-          t('enableBiometricMsg'),
+          isFace ? t('enableFaceIdQ')  : t('enableBiometricQ'),
+          isFace ? t('enableFaceIdMsg') : t('enableBiometricMsg'),
           [
             { text: t('cancel'), style: 'cancel' },
             { text: t('enableBiometricYes'), onPress: () => enableBiometric(phone, pin) },

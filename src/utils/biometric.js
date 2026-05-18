@@ -60,8 +60,7 @@ export async function authenticateWithBiometric(promptMessage = 'Use fingerprint
   try {
     const result = await LocalAuthentication.authenticateAsync({
       promptMessage,
-      fallbackLabel:         'Use PIN instead',
-      disableDeviceFallback: false,
+      disableDeviceFallback: true,  // never fall back to iPhone/Android device passcode
       cancelLabel:           'Cancel',
     });
     return result.success;
