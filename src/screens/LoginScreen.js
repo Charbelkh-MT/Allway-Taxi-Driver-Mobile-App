@@ -243,6 +243,14 @@ export default function LoginScreen() {
               </LinearGradient>
             </TouchableOpacity>
 
+            <TouchableOpacity
+              onPress={() => Alert.alert(t('forgotPinTitle'), t('forgotPinMsg'))}
+              activeOpacity={0.7}
+              style={styles.forgotPin}
+            >
+              <Text style={[styles.forgotPinText, { color: colors.textDisabled }]}>{t('forgotPin')}</Text>
+            </TouchableOpacity>
+
             {showBiometric && (
               <TouchableOpacity
                 onPress={handleBiometricLogin}
@@ -315,6 +323,8 @@ const styles = StyleSheet.create({
   btnWrap:       { marginTop: 20, borderRadius: RADIUS.lg, overflow: 'hidden' },
   btn:           { paddingVertical: 17, alignItems: 'center', justifyContent: 'center' },
   btnText:       { fontSize: 15, fontFamily: FONTS.black, color: '#000', letterSpacing: 0.3 },
+  forgotPin:     { marginTop: 14, alignItems: 'center' },
+  forgotPinText: { fontSize: 12, fontFamily: FONTS.semiBold },
   biometricBtn:  { marginTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: RADIUS.lg, borderWidth: 1 },
   biometricIcon: { fontSize: 20 },
   biometricText: { fontSize: 14, fontFamily: FONTS.bold },

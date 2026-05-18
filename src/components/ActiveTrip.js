@@ -314,6 +314,13 @@ export default function ActiveTrip({ trip, onComplete, onMarkComplete, onPickUp,
           ))}
         </View>
 
+        {!!trip.notes && (
+          <View style={[styles.notesBlock, { backgroundColor: '#F5A62310', borderColor: '#F5A62340' }]}>
+            <Text style={[styles.notesLabel, { color: '#F5A623' }]}>📋  {t('dispatcherNotes')}</Text>
+            <Text style={[styles.notesText,  { color: colors.textSecondary }]}>{trip.notes}</Text>
+          </View>
+        )}
+
         <View style={[styles.metaRow, { borderTopColor: colors.border }]}>
           <View style={styles.metaItem}>
             <Text style={[styles.metaLabel, { color: colors.textMuted }]}>{t('fare')}</Text>
@@ -448,6 +455,9 @@ const styles = StyleSheet.create({
   routeLabel:   { fontSize: 10, fontFamily: FONTS.extraBold, letterSpacing: 1, marginBottom: 3, marginTop: 10 },
   routeText:    { fontSize: 15, fontFamily: FONTS.bold, lineHeight: 21 },
 
+  notesBlock:   { borderWidth: 1, borderRadius: RADIUS.md, padding: 12, marginBottom: 14, gap: 4 },
+  notesLabel:   { fontSize: 10, fontFamily: FONTS.extraBold, letterSpacing: 0.5 },
+  notesText:    { fontSize: 13, fontFamily: FONTS.semiBold, lineHeight: 19 },
   metaRow:      { flexDirection: 'row', borderTopWidth: 1, paddingTop: 14, marginBottom: 18 },
   metaItem:     { flex: 1, alignItems: 'center' },
   metaDivider:  { width: 1, marginVertical: 4 },

@@ -9,6 +9,7 @@ import { supabase } from '../utils/supabase';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 import { FONTS, RADIUS } from '../theme';
+import { isBiometricEnabled, enableBiometric } from '../utils/biometric';
 
 export default function ChangePinModal({ visible, onClose }) {
   const { colors } = useTheme();
@@ -57,6 +58,14 @@ export default function ChangePinModal({ visible, onClose }) {
       }
       const { error: updateError } = await supabase.auth.updateUser({ password: newPin });
       if (updateError) throw updateError;
+
+      // Keep biometric credentials in sync so fingerprint/Face ID still works
+      const biometricOn = await isBiometricEnabled();
+      if (biometricOn) {
+        const phone = user.email?.replace('@allwaytaxi.driver', '') ?? '';
+        if (phone) await enableBiometric(phone, newPin);
+      }
+
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setDone(true);
       setTimeout(close, 2500);

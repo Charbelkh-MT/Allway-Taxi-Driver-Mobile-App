@@ -13,10 +13,11 @@ import { formatTime } from '../utils/dateUtils';
 // In Expo Go, background location tasks crash — use foreground-only tracking
 const IS_EXPO_GO = Constants.appOwnership === 'expo';
 
-const SHIFT_STORAGE_KEY       = 'allway_active_shift';
-const ACTIVE_TRIP_STORAGE_KEY = 'allway_active_trip';
-const CASH_STORAGE_KEY        = 'allway_shift_cash';
-const DISMISSED_IDS_KEY       = 'allway_dismissed_ids';
+const SHIFT_STORAGE_KEY           = 'allway_active_shift';
+const ACTIVE_TRIP_STORAGE_KEY     = 'allway_active_trip';
+const CASH_STORAGE_KEY            = 'allway_shift_cash';
+const DISMISSED_IDS_KEY           = 'allway_dismissed_ids';
+const PENDING_COMPLETION_KEY      = 'allway_pending_completion';
 
 export const DRIVER_STATE = {
   OFFLINE:  'offline',
@@ -230,7 +231,14 @@ export function DriverProvider({ children }) {
   const dismissedIdsRef   = useRef(new Set());
   // Mirrors driverState in a ref so closures (e.g. reconnect timeouts) always
   // read the current value rather than the value captured at closure creation.
-  const driverStateRef    = useRef(DRIVER_STATE.OFFLINE);
+  const driverStateRef      = useRef(DRIVER_STATE.OFFLINE);
+  // Tracks which scheduled trip IDs have already fired a reminder so we don't
+  // spam the driver every minute.
+  const remindedTripIds     = useRef(new Set());
+  const reminderIntervalRef = useRef(null);
+  const scheduledTripsRef   = useRef([]);
+
+  useEffect(() => { scheduledTripsRef.current = scheduledTrips; }, [scheduledTrips]);
 
   useEffect(() => {
     driverStateRef.current = driverState;
@@ -286,6 +294,21 @@ export function DriverProvider({ children }) {
           const c = parseFloat(savedCash) || 0;
           cashRef.current = c;
           setCashCollected(c);
+        }
+
+        // Retry any completion that failed while offline
+        const pendingRaw = await AsyncStorage.getItem(PENDING_COMPLETION_KEY);
+        if (pendingRaw) {
+          try {
+            const { tripId: pid, payload } = JSON.parse(pendingRaw);
+            const { error } = await supabase.from(TABLE_TRIPS).update(payload).eq(TRIP_COLS.id, pid);
+            if (!error) {
+              await AsyncStorage.removeItem(PENDING_COMPLETION_KEY);
+              console.log('[DriverContext] Pending completion synced for trip:', pid);
+            }
+          } catch (e) {
+            console.warn('[DriverContext] Pending completion retry failed:', e.message);
+          }
         }
 
         const savedDismissed = await AsyncStorage.getItem(DISMISSED_IDS_KEY);
@@ -787,6 +810,24 @@ export function DriverProvider({ children }) {
     subscribeToTrips(user.id);
     // fetchScheduledTrips is called in the SUBSCRIBED callback — no need to call it here
 
+    // Check every 60s if any scheduled trip is within 15 minutes — alert once per trip.
+    clearInterval(reminderIntervalRef.current);
+    reminderIntervalRef.current = setInterval(() => {
+      const now = Date.now();
+      scheduledTripsRef.current.forEach(trip => {
+        if (remindedTripIds.current.has(trip.id)) return;
+        const msUntil = new Date(trip.scheduledFor).getTime() - now;
+        if (msUntil > 0 && msUntil <= 15 * 60 * 1000) {
+          remindedTripIds.current.add(trip.id);
+          const mins = Math.round(msUntil / 60000);
+          Alert.alert(
+            '🕐 Upcoming Trip',
+            `You have a scheduled trip in ${mins} minute${mins !== 1 ? 's' : ''}.\n\nPickup: ${trip.pickup}`,
+          );
+        }
+      });
+    }, 60000);
+
     try {
       await supabase.from(TABLE_DRIVERS)
         .update({ [DRIVER_COLS.online]: true, [DRIVER_COLS.status]: 'available' })
@@ -848,6 +889,9 @@ export function DriverProvider({ children }) {
     }
     clearInterval(emergencyPollRef.current);
     emergencyPollRef.current = null;
+    clearInterval(reminderIntervalRef.current);
+    reminderIntervalRef.current = null;
+    remindedTripIds.current.clear();
 
     stopForegroundTracking();
     stopLocationTracking();
@@ -1084,9 +1128,13 @@ export function DriverProvider({ children }) {
           if (e2) throw e2;
         } catch (e3) {
           console.warn('[DriverContext] completeTrip retry also failed:', e3.message);
+          // Persist to AsyncStorage so it can be retried when connectivity returns
+          try {
+            await AsyncStorage.setItem(PENDING_COMPLETION_KEY, JSON.stringify({ tripId, payload: fullPayload }));
+          } catch {}
           Alert.alert(
             'Trip Save Failed',
-            'Payment details could not be recorded. Your trip is marked complete but receipts may be missing. Please inform the dispatcher.',
+            'No internet connection. Payment details have been saved locally and will sync automatically when you are back online.',
           );
         }
       }
