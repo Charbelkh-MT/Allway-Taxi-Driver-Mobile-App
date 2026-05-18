@@ -112,16 +112,24 @@ export default function LoginScreen() {
     setError('');
     setLoading(true);
     try {
-      const passed = await authenticateWithBiometric(t('biometricPrompt'));
-      if (!passed) {
-        setError(t('biometricFailed'));
-        triggerShake();
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      const isFace  = biometricType === 'face';
+      const prompt  = isFace ? t('faceIdPrompt') : t('biometricPrompt');
+      const result  = await authenticateWithBiometric(prompt);
+
+      if (!result.success) {
+        // User pressed Cancel — do nothing, let them type their PIN
+        const cancelled = result.error === 'user_cancel' || result.error === 'system_cancel';
+        if (!cancelled) {
+          setError(isFace ? t('faceIdFailed') : t('biometricFailed'));
+          triggerShake();
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        }
         return;
       }
+
       const creds = await getBiometricCredentials();
       if (!creds) {
-        setError(t('biometricFailed'));
+        setError(isFace ? t('faceIdFailed') : t('biometricFailed'));
         return;
       }
       await login(creds.phone, creds.pin);
